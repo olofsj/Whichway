@@ -9,12 +9,12 @@ INCLUDES = \
 -DPACKAGE_BIN_DIR=\"$(bindir)\" \
 @WHICHWAY_CFLAGS@
 
-lib_LTLIBRARIES = libwhichway.la
+#lib_LTLIBRARIES = libwhichway.la
 
-include_HEADERS = Whichway.h
+#include_HEADERS = Whichway.h
 
-libwhichway_la_SOURCES = 
+#libwhichway_la_SOURCES = 
 
-libwhichway_la_CFLAGS =
-libwhichway_la_LIBADD = @WHICHWAY_LIBS@
-libwhichway_la_LDFLAGS = -no-undefined @lt_enable_auto_import@ -version-info @version_info@ @release_info@
+#libwhichway_la_CFLAGS =
+#libwhichway_la_LIBADD = 
+#libwhichway_la_LDFLAGS = -no-undefined 

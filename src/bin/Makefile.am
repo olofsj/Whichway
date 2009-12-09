@@ -7,12 +7,12 @@ INCLUDES = \
 -I$(top_srcdir)/src/bin \
 -DPACKAGE_DATA_DIR=\"$(datadir)/$(PACKAGE)\" \
 -DPACKAGE_BIN_DIR=\"$(bindir)\" \
-@WHICHWAY_CFLAGS@
+-I/usr/include/postgresql
 
-#bin_PROGRAMS = whichway_test
+bin_PROGRAMS = whichway_create_index
 
-#whichway_test_SOURCES = 
+whichway_create_index_SOURCES = whichway_create_index.c
 
-#whichway_test_LDADD = $(top_builddir)/src/lib/libelementary.la
-#whichway_test_LDFLAGS =
+whichway_create_index_LDADD = -lpq
+whichway_create_index_LDFLAGS =
 

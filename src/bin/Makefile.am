@@ -5,6 +5,7 @@ MAINTAINERCLEANFILES = Makefile.in
 INCLUDES = \
 -I$(top_srcdir) \
 -I$(top_srcdir)/src/bin \
+-I$(top_srcdir)/src/lib \
 -DPACKAGE_DATA_DIR=\"$(datadir)/$(PACKAGE)\" \
 -DPACKAGE_BIN_DIR=\"$(bindir)\"
 

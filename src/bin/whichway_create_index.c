@@ -34,6 +34,7 @@ struct _Way {
     WayNode *end;
     int oneway;
     int size;
+    TAG_HIGHWAY type;
 };
 
 struct _NodeList {
@@ -46,6 +47,9 @@ struct _Node {
     double lat;
     double lon;
 };
+
+TAG_HIGHWAY used_highways[] = {secondary, secondary_link, tertiary, unclassified, road, residential, living_street, service, track, pedestrian, path, cycleway, footway, byway};
+int nrof_used_highways = 14;
 
 /* Global variables */
 int depth;
@@ -145,12 +149,11 @@ wayparser_start(void *data, const char *el, const char **attr) {
   int i;
 
   if (!strcmp(el, "way")) {
-      way_count++;
-
       way.size = 0;
       way.start = NULL;
       way.end = NULL;
       way.oneway = 0;
+      way.type = no_highway;
   }
   else if (!strcmp(el, "tag") && way.size != -1) {
       if (!strcmp(attr[0], "k") && !strcmp(attr[1], "oneway") &&
@@ -158,6 +161,15 @@ wayparser_start(void *data, const char *el, const char **attr) {
               (!strcmp(attr[3], "yes") || !strcmp(attr[3], "true")) ) {
           // Current way is oneway
           way.oneway = 1;
+      }
+      if (!strcmp(attr[0], "k") && !strcmp(attr[1], "highway") &&
+              !strcmp(attr[2], "v")) {
+          // Highway tag
+          for (i = 0; i < NROF_TAG_HIGHWAY_VALUES; i++) {
+              if (!strcmp(attr[3], TAG_HIGHWAY_VALUES[i])) {
+                  way.type = i;
+              }
+          }
       }
   }
   else if (!strcmp(el, "nd") && way.size != -1) {
@@ -192,57 +204,62 @@ wayparser_end(void *data, const char *el) {
     Node *nd;
 
     if (!strcmp(el, "way")) {
-        if (way.start->id == 302797085) {
-            printf("way.size = %d\n", way.size);
-        }
-        // Add the parsed way into the routing index
-        index = ri.size;
+        for (i = 0; i < nrof_used_highways; i++) {
+            if (used_highways[i] == way.type) {
+                way_count++;
 
-        if (way.oneway)
-            ri.size = ri.size + (way.size-1);
-        else 
-            ri.size = ri.size + 2*(way.size-1);
-        ri.ways = realloc(ri.ways, ri.size * sizeof(RoutingWay));
+                // Add the parsed way into the routing index
+                index = ri.size;
 
-        cn = way.start;
-        while (cn->next) {
-            ri.ways[index].from.id = cn->id;
-            ri.ways[index].to.id = cn->next->id;
+                if (way.oneway)
+                    ri.size = ri.size + (way.size-1);
+                else 
+                    ri.size = ri.size + 2*(way.size-1);
+                ri.ways = realloc(ri.ways, ri.size * sizeof(RoutingWay));
 
-            nd = get_node(ri.ways[index].from.id);
-            if (nd) {
-                ri.ways[index].from.lat = nd->lat;
-                ri.ways[index].from.lon = nd->lon;
-            }
+                cn = way.start;
+                while (cn->next) {
+                    ri.ways[index].type = way.type;
+                    ri.ways[index].from.id = cn->id;
+                    ri.ways[index].to.id = cn->next->id;
 
-            nd = get_node(ri.ways[index].to.id);
-            if (nd) {
-                ri.ways[index].to.lat = nd->lat;
-                ri.ways[index].to.lon = nd->lon;
-            }
+                    nd = get_node(ri.ways[index].from.id);
+                    if (nd) {
+                        ri.ways[index].from.lat = nd->lat;
+                        ri.ways[index].from.lon = nd->lon;
+                    }
 
-            index++;
+                    nd = get_node(ri.ways[index].to.id);
+                    if (nd) {
+                        ri.ways[index].to.lat = nd->lat;
+                        ri.ways[index].to.lon = nd->lon;
+                    }
 
-            if (!way.oneway) {
-                ri.ways[index].from.id = cn->next->id;
-                ri.ways[index].to.id = cn->id;
+                    index++;
 
-                nd = get_node(ri.ways[index].from.id);
-                if (nd) {
-                    ri.ways[index].from.lat = nd->lat;
-                    ri.ways[index].from.lon = nd->lon;
+                    if (!way.oneway) {
+                        ri.ways[index].type = way.type;
+                        ri.ways[index].from.id = cn->next->id;
+                        ri.ways[index].to.id = cn->id;
+
+                        nd = get_node(ri.ways[index].from.id);
+                        if (nd) {
+                            ri.ways[index].from.lat = nd->lat;
+                            ri.ways[index].from.lon = nd->lon;
+                        }
+
+                        nd = get_node(ri.ways[index].to.id);
+                        if (nd) {
+                            ri.ways[index].to.lat = nd->lat;
+                            ri.ways[index].to.lon = nd->lon;
+                        }
+
+                        index++;
+                    }
+
+                    cn = cn->next;
                 }
-
-                nd = get_node(ri.ways[index].to.id);
-                if (nd) {
-                    ri.ways[index].to.lat = nd->lat;
-                    ri.ways[index].to.lon = nd->lon;
-                }
-
-                index++;
             }
-
-            cn = cn->next;
         }
 
         // Free the nodes
@@ -254,7 +271,6 @@ wayparser_end(void *data, const char *el) {
             cn = next;
         }
         way.size = -1;
-
     }
 
     depth--;
@@ -363,9 +379,9 @@ main(int argc, char **argv)
     printf("Number of nodes: %d\n", node_count);
     printf("Number of ways: %d\n", way_count);
     for (i = 0; i < 10; i++)
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf)\n", i, 
+        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) : %s\n", i, 
                 ri.ways[i].from.id, ri.ways[i].from.lat, ri.ways[i].from.lon, 
-                ri.ways[i].to.id, ri.ways[i].to.lat, ri.ways[i].to.lon);
+                ri.ways[i].to.id, ri.ways[i].to.lat, ri.ways[i].to.lon, TAG_HIGHWAY_VALUES[ri.ways[i].type]);
     //for (i = 0; i < 10; i++)
         //printf("Node %d: %d (%lf %lf)\n", i, nodes[i]->id, nodes[i]->lat, nodes[i]->lon);
 }

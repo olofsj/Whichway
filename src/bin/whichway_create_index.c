@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <expat.h>
+#include <math.h>
 #include "whichway_internal.h"
 
 typedef struct _File File;
@@ -46,6 +47,7 @@ struct _Node {
     int id;
     double lat;
     double lon;
+    int ways;
 };
 
 TAG_HIGHWAY used_highways[] = {secondary, secondary_link, tertiary, unclassified, road, residential, living_street, service, track, pedestrian, path, cycleway, footway, byway};
@@ -56,10 +58,24 @@ int depth;
 int node_count;
 NodeList *node_list;
 Node **nodes;
+Node **nodes_ways_from;
+Node **nodes_ways_to;
 int way_count;
 RoutingIndex ri;
 Way way;
 
+// Calculate the distance between two points on the earths surface
+double distance(double from_lat, double from_lon, double to_lat, double to_lon) {
+    // Earth radius
+    double lambda, phi, phi_m;
+    double R = 6371009;
+
+    phi_m = (to_lat + from_lat)/360.0*M_PI;
+    phi = (to_lat - from_lat)/180.0*M_PI;
+    lambda = (to_lon - from_lon)/180.0*M_PI;
+
+    return R*sqrt(phi*phi + pow(cos(phi_m)*lambda, 2));
+}
 
 NodeList *
 nodelist_insert(NodeList *list, NodeList *el) {
@@ -121,6 +137,7 @@ nodeparser_start(void *data, const char *el, const char **attr) {
       l = malloc(sizeof(NodeList));
       l->next = NULL;
       l->node = malloc(sizeof(Node));
+      l->node->ways = 0;
 
       /* Check all the attributes for this node */
       for (i = 0; attr[i]; i += 2) {
@@ -228,12 +245,26 @@ wayparser_end(void *data, const char *el) {
                         ri.ways[index].from.lat = nd->lat;
                         ri.ways[index].from.lon = nd->lon;
                     }
+                    // Store pointer for easy access later
+                    nodes_ways_from = realloc(nodes_ways_from, (index+1)*sizeof(Node *));
+                    nodes_ways_from[index] = nd;
+                    nd->ways++;
 
                     nd = get_node(ri.ways[index].to.id);
                     if (nd) {
                         ri.ways[index].to.lat = nd->lat;
                         ri.ways[index].to.lon = nd->lon;
                     }
+                    // Store pointer for easy access later
+                    nodes_ways_to = realloc(nodes_ways_to, (index+1)*sizeof(Node *));
+                    nodes_ways_to[index] = nd;
+                    nd->ways++;
+
+                    ri.ways[index].length = distance(
+                            ri.ways[index].from.lat,
+                            ri.ways[index].from.lon,
+                            ri.ways[index].to.lat,
+                            ri.ways[index].to.lon);
 
                     index++;
 
@@ -247,13 +278,22 @@ wayparser_end(void *data, const char *el) {
                             ri.ways[index].from.lat = nd->lat;
                             ri.ways[index].from.lon = nd->lon;
                         }
+                        // Store pointer for easy access later
+                        nodes_ways_from = realloc(nodes_ways_from, (index+1)*sizeof(Node *));
+                        nodes_ways_from[index] = nd;
+                        nd->ways++;
 
                         nd = get_node(ri.ways[index].to.id);
                         if (nd) {
                             ri.ways[index].to.lat = nd->lat;
                             ri.ways[index].to.lon = nd->lon;
                         }
+                        // Store pointer for easy access later
+                        nodes_ways_to = realloc(nodes_ways_to, (index+1)*sizeof(Node *));
+                        nodes_ways_to[index] = nd;
+                        nd->ways++;
 
+                        ri.ways[index].length = ri.ways[index-1].length;
                         index++;
                     }
 
@@ -367,6 +407,8 @@ main(int argc, char **argv)
     ri.size = 0;
     ri.ways = NULL;
     way.size = -1;
+    nodes_ways_from = NULL;
+    nodes_ways_to = NULL;
 
     /* Parse the XML document */
     if (! XML_Parse(wayparser, osmfile.content, osmfile.size, done)) {
@@ -376,12 +418,14 @@ main(int argc, char **argv)
         exit(-1);
     }
 
+
     printf("Number of nodes: %d\n", node_count);
     printf("Number of ways: %d\n", way_count);
     for (i = 0; i < 10; i++)
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) : %s\n", i, 
+        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) %lf: %s\n", i, 
                 ri.ways[i].from.id, ri.ways[i].from.lat, ri.ways[i].from.lon, 
-                ri.ways[i].to.id, ri.ways[i].to.lat, ri.ways[i].to.lon, TAG_HIGHWAY_VALUES[ri.ways[i].type]);
+                ri.ways[i].to.id, ri.ways[i].to.lat, ri.ways[i].to.lon,
+                ri.ways[i].length, TAG_HIGHWAY_VALUES[ri.ways[i].type]);
     //for (i = 0; i < 10; i++)
         //printf("Node %d: %d (%lf %lf)\n", i, nodes[i]->id, nodes[i]->lat, nodes[i]->lon);
 }

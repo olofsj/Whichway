@@ -13,6 +13,6 @@ bin_PROGRAMS = whichway_create_index
 
 whichway_create_index_SOURCES = whichway_create_index.c
 
-whichway_create_index_LDADD = -lexpat
+whichway_create_index_LDADD = -lexpat -lm
 whichway_create_index_LDFLAGS =
 

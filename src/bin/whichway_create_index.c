@@ -11,10 +11,12 @@
 #include <math.h>
 #include "whichway_internal.h"
 
+typedef int (*List_Compare_Cb) (const void *a, const void *b);
+
 typedef struct _File File;
 typedef struct _WayNode WayNode;
 typedef struct _Way Way;
-typedef struct _NodeList NodeList;
+typedef struct _List List;
 typedef struct _Node Node;
 
 struct _File {
@@ -38,9 +40,9 @@ struct _Way {
     TAG_HIGHWAY type;
 };
 
-struct _NodeList {
-    NodeList *next;
-    Node *node;
+struct _List {
+    List *next;
+    void *data;
 };
 
 struct _Node {
@@ -56,7 +58,7 @@ int nrof_used_highways = 14;
 /* Global variables */
 int depth;
 int node_count;
-NodeList *node_list;
+List *node_list;
 Node **nodes;
 Node **nodes_ways_from;
 Node **nodes_ways_to;
@@ -77,29 +79,57 @@ double distance(double from_lat, double from_lon, double to_lat, double to_lon) 
     return R*sqrt(phi*phi + pow(cos(phi_m)*lambda, 2));
 }
 
-NodeList *
-nodelist_insert(NodeList *list, NodeList *el) {
-    NodeList *cn;
+int
+node_sort_cb(const void *n1, const void *n2)
+{
+    const Node *m1 = NULL;
+    const Node *m2 = NULL;
 
-    if (!list)
-        return el;
+    if (!n1) return(1);
+    if (!n2) return(-1);
 
-    if (el->node->id < list->node->id) {
-        el->next = list;
-        return el;
+    m1 = n1;
+    m2 = n2;
+
+    if (m1->id > m2->id)
+        return 1;
+    if (m1->id < m2->id)
+        return -1;
+    return 0;
+}
+
+List *
+list_sorted_insert(List *list, void *data, List_Compare_Cb compare) {
+    List *cn;
+    List *l;
+
+    l = malloc(sizeof(List));
+    l->data = data;
+
+    if (!list) {
+        return l;
     }
 
+    // Check the head of the list
+    if (compare(data, list->data) <= 0) {
+        l->next = list;
+        return l;
+    }
+
+    // Walk the list
     cn = list;
     while (cn->next) {
-        if (el->node->id < cn->next->node->id) {
-            el->next = cn->next;
-            cn->next = el;
+        //if (el->node->id < cn->next->node->id) {
+        if (compare(data, cn->next->data) <= 0) {
+            l->next = cn->next;
+            cn->next = l;
             return list;
         }
         cn = cn->next;
     }
 
-    cn->next = el;
+    // Not found, append to end
+    cn->next = l;
     return list;
 }
 
@@ -130,26 +160,24 @@ nodeparser_start(void *data, const char *el, const char **attr) {
   int i;
 
   if (!strcmp(el, "node")) {
-      NodeList *l;
+      Node *node;
 
       node_count++;
 
-      l = malloc(sizeof(NodeList));
-      l->next = NULL;
-      l->node = malloc(sizeof(Node));
-      l->node->ways = 0;
+      node = malloc(sizeof(Node));
+      node->ways = 0;
 
       /* Check all the attributes for this node */
       for (i = 0; attr[i]; i += 2) {
           if (!strcmp(attr[i], "id")) 
-              sscanf(attr[i+1], "%d", &(l->node->id));
+              sscanf(attr[i+1], "%d", &(node->id));
           if (!strcmp(attr[i], "lat")) 
-              sscanf(attr[i+1], "%lf", &(l->node->lat));
+              sscanf(attr[i+1], "%lf", &(node->lat));
           if (!strcmp(attr[i], "lon")) 
-              sscanf(attr[i+1], "%lf", &(l->node->lon));
+              sscanf(attr[i+1], "%lf", &(node->lon));
       }
 
-      node_list = nodelist_insert(node_list, l);
+      node_list = list_sorted_insert(node_list, node, node_sort_cb);
   }
 
   depth++;
@@ -326,7 +354,7 @@ main(int argc, char **argv)
     int i;
     int done;
     int len;
-    NodeList *cn;
+    List *cn;
     
     
     printf("Whichway Create Index\n");
@@ -389,7 +417,7 @@ main(int argc, char **argv)
     i = 0;
     cn = node_list;
     while (cn) {
-        nodes[i++] = cn->node;
+        nodes[i++] = (Node *)(cn->data);
         cn = cn->next;
     }
 
@@ -417,6 +445,11 @@ main(int argc, char **argv)
                 XML_ErrorString(XML_GetErrorCode(wayparser)));
         exit(-1);
     }
+
+    // Postprocess the routing index, ordering the ways and getting the 
+    // index of the target way
+
+    
 
 
     printf("Number of nodes: %d\n", node_count);

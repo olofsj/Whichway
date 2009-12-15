@@ -31,5 +31,6 @@ struct _RoutingWay {
     RoutingNode to;
     TAG_HIGHWAY type;
     double length;
+    int next;
 };
 

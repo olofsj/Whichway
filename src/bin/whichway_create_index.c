@@ -98,6 +98,25 @@ node_sort_cb(const void *n1, const void *n2)
     return 0;
 }
 
+int
+way_sort_cb(const void *n1, const void *n2)
+{
+    const RoutingWay *m1 = NULL;
+    const RoutingWay *m2 = NULL;
+
+    if (!n1) return(1);
+    if (!n2) return(-1);
+
+    m1 = n1;
+    m2 = n2;
+
+    if (m1->from.id > m2->from.id)
+        return 1;
+    if (m1->from.id < m2->from.id)
+        return -1;
+    return 0;
+}
+
 List *
 list_sorted_insert(List *list, void *data, List_Compare_Cb compare) {
     List *cn;
@@ -105,6 +124,7 @@ list_sorted_insert(List *list, void *data, List_Compare_Cb compare) {
 
     l = malloc(sizeof(List));
     l->data = data;
+    l->next = NULL;
 
     if (!list) {
         return l;
@@ -119,7 +139,6 @@ list_sorted_insert(List *list, void *data, List_Compare_Cb compare) {
     // Walk the list
     cn = list;
     while (cn->next) {
-        //if (el->node->id < cn->next->node->id) {
         if (compare(data, cn->next->data) <= 0) {
             l->next = cn->next;
             cn->next = l;
@@ -131,6 +150,23 @@ list_sorted_insert(List *list, void *data, List_Compare_Cb compare) {
     // Not found, append to end
     cn->next = l;
     return list;
+}
+
+int
+way_find(RoutingWay* ways, int id, int low, int high) {
+    int mid;
+
+    if (high < low)
+        return -1; // not found
+
+    mid = low + ((high - low) / 2);
+    if (ways[mid].from.id > id) {
+        return way_find(ways, id, low, mid-1);
+    } else if (ways[mid].from.id < id) {
+        return way_find(ways, id, mid+1, high);
+    } else {
+        return mid;
+    }
 }
 
 Node *
@@ -355,6 +391,7 @@ main(int argc, char **argv)
     int done;
     int len;
     List *cn;
+    RoutingWay *ways;
     
     
     printf("Whichway Create Index\n");
@@ -449,15 +486,39 @@ main(int argc, char **argv)
     // Postprocess the routing index, ordering the ways and getting the 
     // index of the target way
 
-    
+    // Create a sorted list of ways
+    List *list = NULL;
+    for (i = 0; i < ri.size; i++) {
+        RoutingWay *way = &(ri.ways[i]);
+        list = list_sorted_insert(list, way, way_sort_cb);
+    }
+
+    // Update the routing index with this sorted list
+    ways = malloc(ri.size * sizeof(RoutingWay));
+    List *l = list;
+    i = 0;
+    while (l) {
+        memcpy(&(ways[i]), l->data, sizeof(RoutingWay));
+        l = l->next; i++;
+    }
+    free(ri.ways);
+    ri.ways = ways;
+
+    // Update all elements with the index of the next node
+    for (i = 0; i < ri.size; i++) {
+        ri.ways[i].next = way_find(ri.ways, ri.ways[i].to.id, 0, ri.size-1);
+    }
 
 
     printf("Number of nodes: %d\n", node_count);
     printf("Number of ways: %d\n", way_count);
     for (i = 0; i < 10; i++)
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) %lf: %s\n", i, 
+        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) [%d %d %d] %lf: %s\n", i, 
                 ri.ways[i].from.id, ri.ways[i].from.lat, ri.ways[i].from.lon, 
                 ri.ways[i].to.id, ri.ways[i].to.lat, ri.ways[i].to.lon,
+                ri.ways[ri.ways[i].next-1].from.id,
+                ri.ways[ri.ways[i].next].from.id,
+                ri.ways[ri.ways[i].next+1].from.id,
                 ri.ways[i].length, TAG_HIGHWAY_VALUES[ri.ways[i].type]);
     //for (i = 0; i < 10; i++)
         //printf("Node %d: %d (%lf %lf)\n", i, nodes[i]->id, nodes[i]->lat, nodes[i]->lon);

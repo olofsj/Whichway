@@ -9,10 +9,13 @@ INCLUDES = \
 -DPACKAGE_DATA_DIR=\"$(datadir)/$(PACKAGE)\" \
 -DPACKAGE_BIN_DIR=\"$(bindir)\"
 
-bin_PROGRAMS = whichway_create_index
+bin_PROGRAMS = whichway_create_index whichway_test
 
 whichway_create_index_SOURCES = whichway_create_index.c
-
 whichway_create_index_LDADD = -lexpat -lm
 whichway_create_index_LDFLAGS =
+
+whichway_test_SOURCES = whichway_test.c
+whichway_test_LDADD = -lm
+whichway_test_LDFLAGS =
 

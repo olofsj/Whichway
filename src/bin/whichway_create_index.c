@@ -386,7 +386,7 @@ main(int argc, char **argv)
 {
     File osmfile;
     struct stat st;
-    char *filename;
+    char *filename, *outfilename;
     int i;
     int done;
     int len;
@@ -396,10 +396,11 @@ main(int argc, char **argv)
     
     printf("Whichway Create Index\n");
 
-    if (argc > 1)
+    if (argc > 2) {
         filename = argv[1];
-    else {
-        printf("No file specified.\n");
+        outfilename = argv[2];
+    } else {
+        printf("Input and output files must be specified.\n");
         return 0;
     }
 
@@ -509,10 +510,22 @@ main(int argc, char **argv)
         ri.ways[i].next = way_find(ri.ways, ri.ways[i].to.id, 0, ri.size-1);
     }
 
+    // Write the routing index to disk
+    FILE *fp;
+    fp = fopen(outfilename, "w");
+    if (!fp) {
+        fprintf(stderr, "Can't open output file for writing.\n");
+        exit(-1);
+    }
+    fwrite(ri.ways, sizeof(RoutingWay), ri.size, fp);
+    fclose(fp);
+    printf("ri.size: %d\n", ri.size);
+    printf("sizeof(rw): %d\n", sizeof(RoutingWay));
+    printf("Memory size: %d\n", ri.size*sizeof(RoutingWay));
 
     printf("Number of nodes: %d\n", node_count);
-    printf("Number of ways: %d\n", way_count);
-    for (i = 0; i < 10; i++)
+    printf("Number of ways: %d\n", ri.size);
+    for (i = 0; i < 5; i++) {
         printf("Way %d: %d (%lf %lf) - %d (%lf %lf) [%d %d %d] %lf: %s\n", i, 
                 ri.ways[i].from.id, ri.ways[i].from.lat, ri.ways[i].from.lon, 
                 ri.ways[i].to.id, ri.ways[i].to.lat, ri.ways[i].to.lon,
@@ -520,6 +533,15 @@ main(int argc, char **argv)
                 ri.ways[ri.ways[i].next].from.id,
                 ri.ways[ri.ways[i].next+1].from.id,
                 ri.ways[i].length, TAG_HIGHWAY_VALUES[ri.ways[i].type]);
+        int k = ri.size - 1 - i;
+        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) [%d %d %d] %lf: %s\n", k, 
+                ri.ways[k].from.id, ri.ways[k].from.lat, ri.ways[k].from.lon, 
+                ri.ways[k].to.id, ri.ways[k].to.lat, ri.ways[k].to.lon,
+                ri.ways[ri.ways[k].next-1].from.id,
+                ri.ways[ri.ways[k].next].from.id,
+                ri.ways[ri.ways[k].next+1].from.id,
+                ri.ways[k].length, TAG_HIGHWAY_VALUES[ri.ways[k].type]);
+    }
     //for (i = 0; i < 10; i++)
         //printf("Node %d: %d (%lf %lf)\n", i, nodes[i]->id, nodes[i]->lat, nodes[i]->lon);
 }

@@ -12,10 +12,10 @@ INCLUDES = \
 bin_PROGRAMS = whichway_create_index whichway_test
 
 whichway_create_index_SOURCES = whichway_create_index.c
-whichway_create_index_LDADD = -lexpat -lm
+whichway_create_index_LDADD = -lexpat -lm $(top_builddir)/src/lib/libwhichway.la
 whichway_create_index_LDFLAGS =
 
 whichway_test_SOURCES = whichway_test.c
-whichway_test_LDADD = -lm
+whichway_test_LDADD = -lm $(top_builddir)/src/lib/libwhichway.la
 whichway_test_LDFLAGS =
 

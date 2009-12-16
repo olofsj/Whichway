@@ -11,20 +11,9 @@
 #include <math.h>
 #include "whichway_internal.h"
 
-typedef int (*List_Compare_Cb) (const void *a, const void *b);
-
-typedef struct _File File;
 typedef struct _WayNode WayNode;
 typedef struct _Way Way;
-typedef struct _List List;
 typedef struct _Node Node;
-
-struct _File {
-    char *file;
-    int fd;
-    char *content;
-    int size;
-};
 
 struct _WayNode {
     int id;
@@ -40,17 +29,19 @@ struct _Way {
     TAG_HIGHWAY type;
 };
 
-struct _List {
-    List *next;
-    void *data;
-};
-
 struct _Node {
     int id;
     double lat;
     double lon;
     int ways;
 };
+
+char *TAG_HIGHWAY_VALUES[] = { "no", "motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link", "secondary", "secondary_link", "tertiary", "unclassified", "road", "residential", "living_street", "service", "track", "pedestrian", "raceway", "services", "bus_guideway", "path", "cycleway", "footway", "bridleway", "byway", "steps", "mini_roundabout", "stop", "traffic_signals", "crossing", "motorway_junction", "incline", "incline_steep", "ford", "bus_stop", "turning_circle", "construction", "proposed", "emergency_access_point", "speed_camera" };
+#define NROF_TAG_HIGHWAY_VALUES 40
+char *TAG_TRAFFIC_CALMING_VALUES[] = { "no", "yes", "bump", "chicane", "cushion", "hump", "rumble_strip", "table", "choker" };
+#define NROF_TAG_TRAFFIC_CALMING_VALUES 9
+char *TAG_SMOOTHNESS_VALUES[] = { "no", "excellent", "good", "intermediate", "bad", "very_bad", "horrible", "very_horrible", "impassable" };
+#define NROF_TAG_SMOOTHNESS_VALUES 9
 
 TAG_HIGHWAY used_highways[] = {secondary, secondary_link, tertiary, unclassified, road, residential, living_street, service, track, pedestrian, path, cycleway, footway, byway};
 int nrof_used_highways = 14;
@@ -65,19 +56,6 @@ Node **nodes_ways_to;
 int way_count;
 RoutingIndex ri;
 Way way;
-
-// Calculate the distance between two points on the earths surface
-double distance(double from_lat, double from_lon, double to_lat, double to_lon) {
-    // Earth radius
-    double lambda, phi, phi_m;
-    double R = 6371009;
-
-    phi_m = (to_lat + from_lat)/360.0*M_PI;
-    phi = (to_lat - from_lat)/180.0*M_PI;
-    lambda = (to_lon - from_lon)/180.0*M_PI;
-
-    return R*sqrt(phi*phi + pow(cos(phi_m)*lambda, 2));
-}
 
 int
 node_sort_cb(const void *n1, const void *n2)
@@ -115,41 +93,6 @@ way_sort_cb(const void *n1, const void *n2)
     if (m1->from.id < m2->from.id)
         return -1;
     return 0;
-}
-
-List *
-list_sorted_insert(List *list, void *data, List_Compare_Cb compare) {
-    List *cn;
-    List *l;
-
-    l = malloc(sizeof(List));
-    l->data = data;
-    l->next = NULL;
-
-    if (!list) {
-        return l;
-    }
-
-    // Check the head of the list
-    if (compare(data, list->data) <= 0) {
-        l->next = list;
-        return l;
-    }
-
-    // Walk the list
-    cn = list;
-    while (cn->next) {
-        if (compare(data, cn->next->data) <= 0) {
-            l->next = cn->next;
-            cn->next = l;
-            return list;
-        }
-        cn = cn->next;
-    }
-
-    // Not found, append to end
-    cn->next = l;
-    return list;
 }
 
 int
@@ -519,9 +462,6 @@ main(int argc, char **argv)
     }
     fwrite(ri.ways, sizeof(RoutingWay), ri.size, fp);
     fclose(fp);
-    printf("ri.size: %d\n", ri.size);
-    printf("sizeof(rw): %d\n", sizeof(RoutingWay));
-    printf("Memory size: %d\n", ri.size*sizeof(RoutingWay));
 
     printf("Number of nodes: %d\n", node_count);
     printf("Number of ways: %d\n", ri.size);

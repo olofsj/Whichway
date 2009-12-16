@@ -10,16 +10,6 @@
 #include <math.h>
 #include "whichway_internal.h"
 
-typedef struct _File File;
-
-struct _File {
-    char *file;
-    int fd;
-    char *content;
-    int size;
-};
-
-
 int
 main(int argc, char **argv)
 {
@@ -62,7 +52,7 @@ main(int argc, char **argv)
     }
 
     printf("filesize: %d\n", routingfile.size);
-    printf("sizeof(rw): %d\n", sizeof(RoutingWay));
+    printf("sizeof(rw): %d\n", (int)sizeof(RoutingWay));
 
     ri.size = routingfile.size/sizeof(RoutingWay);
     ri.ways = (RoutingWay *)routingfile.content;
@@ -70,21 +60,21 @@ main(int argc, char **argv)
 
     printf("Number of ways: %d\n", ri.size);
     for (i = 0; i < 5; i++) {
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) [%d %d %d] %lf: %s\n", i, 
+        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) [%d %d %d] %lf\n", i, 
                 ri.ways[i].from.id, ri.ways[i].from.lat, ri.ways[i].from.lon, 
                 ri.ways[i].to.id, ri.ways[i].to.lat, ri.ways[i].to.lon,
                 ri.ways[ri.ways[i].next-1].from.id,
                 ri.ways[ri.ways[i].next].from.id,
                 ri.ways[ri.ways[i].next+1].from.id,
-                ri.ways[i].length, TAG_HIGHWAY_VALUES[ri.ways[i].type]);
+                ri.ways[i].length);
         int k = ri.size - 1 - i;
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) [%d %d %d] %lf: %s\n", k, 
+        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) [%d %d %d] %lf\n", k, 
                 ri.ways[k].from.id, ri.ways[k].from.lat, ri.ways[k].from.lon, 
                 ri.ways[k].to.id, ri.ways[k].to.lat, ri.ways[k].to.lon,
                 ri.ways[ri.ways[k].next-1].from.id,
                 ri.ways[ri.ways[k].next].from.id,
                 ri.ways[ri.ways[k].next+1].from.id,
-                ri.ways[k].length, TAG_HIGHWAY_VALUES[ri.ways[k].type]);
+                ri.ways[k].length);
     }
     //for (i = 0; i < 10; i++)
         //printf("Node %d: %d (%lf %lf)\n", i, nodes[i]->id, nodes[i]->lat, nodes[i]->lon);

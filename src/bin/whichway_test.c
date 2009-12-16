@@ -59,7 +59,7 @@ main(int argc, char **argv)
 
 
     printf("Number of ways: %d\n", ri.size);
-    for (i = 0; i < 5; i++) {
+    for (i = 0; i < 2; i++) {
         printf("Way %d: %d (%lf %lf) - %d (%lf %lf) [%d %d %d] %lf\n", i, 
                 ri.ways[i].from.id, ri.ways[i].from.lat, ri.ways[i].from.lon, 
                 ri.ways[i].to.id, ri.ways[i].to.lat, ri.ways[i].to.lon,
@@ -76,6 +76,10 @@ main(int argc, char **argv)
                 ri.ways[ri.ways[k].next+1].from.id,
                 ri.ways[k].length);
     }
+
+    Route *route;
+    route = ww_routing_astar(&ri, &ri.ways[2].from, &ri.ways[20].from);
+    
     //for (i = 0; i < 10; i++)
         //printf("Node %d: %d (%lf %lf)\n", i, nodes[i]->id, nodes[i]->lat, nodes[i]->lon);
 }

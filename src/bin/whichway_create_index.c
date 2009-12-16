@@ -95,23 +95,6 @@ way_sort_cb(const void *n1, const void *n2)
     return 0;
 }
 
-int
-way_find(RoutingWay* ways, int id, int low, int high) {
-    int mid;
-
-    if (high < low)
-        return -1; // not found
-
-    mid = low + ((high - low) / 2);
-    if (ways[mid].from.id > id) {
-        return way_find(ways, id, low, mid-1);
-    } else if (ways[mid].from.id < id) {
-        return way_find(ways, id, mid+1, high);
-    } else {
-        return mid;
-    }
-}
-
 Node *
 node_find(Node** nodes, int id, int low, int high) {
     int mid;
@@ -450,7 +433,7 @@ main(int argc, char **argv)
 
     // Update all elements with the index of the next node
     for (i = 0; i < ri.size; i++) {
-        ri.ways[i].next = way_find(ri.ways, ri.ways[i].to.id, 0, ri.size-1);
+        ri.ways[i].next = routing_index_find_node(&ri, ri.ways[i].to.id);
     }
 
     // Write the routing index to disk

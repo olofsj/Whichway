@@ -91,6 +91,19 @@ List * list_append(List *list, void *data) {
     return list;
 }
 
+List * list_find(List *list, void *data, List_Compare_Cb compare) {
+    List *l;
+
+    l = list;
+    while (l) {
+        if (compare(l->data, data) == 0)
+            return l;
+        l = l->next;
+    }
+
+    return NULL;
+}
+
 int list_count(List *list) {
     List *l;
     int count = 0;

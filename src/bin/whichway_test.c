@@ -58,6 +58,7 @@ main(int argc, char **argv)
     ri.ways = (RoutingWay *)routingfile.content;
 
 
+    /*
     printf("Number of ways: %d\n", ri.size);
     for (i = 0; i < 2; i++) {
         printf("Way %d: %d (%lf %lf) - %d (%lf %lf) [%d %d %d] %lf\n", i, 
@@ -76,9 +77,23 @@ main(int argc, char **argv)
                 ri.ways[ri.ways[k].next+1].from.id,
                 ri.ways[k].length);
     }
+    */
 
     Route *route;
-    route = ww_routing_astar(&ri, &ri.ways[2].from, &ri.ways[20].from);
+    //route = ww_routing_astar(&ri, ri.ways[2].from.id, ri.ways[20].from.id);
+    //route = ww_routing_astar(&ri, 5499470, 277299251);
+    //route = ww_routing_astar(&ri, 292874624, 292820169);
+    route = ww_routing_astar(&ri, 5499470, 609217);
+
+    if (!route) {
+        printf("No route found.\n");
+    } else {
+        printf("Optimal route: %d nodes, %lf m\n", route->nrof_nodes, route->length);
+        for (i = 0; i < route->nrof_nodes; i++) {
+            printf("%d ", route->nodes[i].id);
+        }
+        printf("\n");
+    }
     
     //for (i = 0; i < 10; i++)
         //printf("Node %d: %d (%lf %lf)\n", i, nodes[i]->id, nodes[i]->lat, nodes[i]->lon);

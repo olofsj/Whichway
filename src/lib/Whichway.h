@@ -40,6 +40,6 @@ struct _RoutingWay {
 };
 
 
-Route * ww_routing_astar(RoutingIndex *ri, RoutingNode *from, RoutingNode *to);
+Route * ww_routing_astar(RoutingIndex *ri, int from_id, int to_id);
 
 #endif /* WHICHWAY_H_ */

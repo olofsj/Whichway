@@ -434,6 +434,9 @@ main(int argc, char **argv)
     // Update all elements with the index of the next node
     for (i = 0; i < ri.size; i++) {
         ri.ways[i].next = routing_index_find_node(&ri, ri.ways[i].to.id);
+        if (ri.ways[i].next < 0) {
+            printf("next node not found for id %d\n", ri.ways[i].to.id);
+        }
     }
 
     // Write the routing index to disk

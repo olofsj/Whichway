@@ -26,6 +26,7 @@ double distance(double from_lat, double from_lon, double to_lat, double to_lon);
 List * list_sorted_insert(List *list, void *data, List_Compare_Cb compare);
 List * list_prepend(List *list, void *data);
 List * list_append(List *list, void *data);
+List * list_find(List *list, void *data, List_Compare_Cb compare);
 int list_count(List *list);
 
 int routing_index_bsearch(RoutingWay* ways, int id, int low, int high);

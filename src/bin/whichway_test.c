@@ -80,19 +80,22 @@ main(int argc, char **argv)
     */
 
     Route *route;
-    //route = ww_routing_astar(&ri, ri.ways[2].from.id, ri.ways[20].from.id);
-    //route = ww_routing_astar(&ri, 5499470, 277299251);
-    //route = ww_routing_astar(&ri, 292874624, 292820169);
-    route = ww_routing_astar(&ri, 5499470, 609217);
+    int from[3] = {5499470, 292874624, 5499470};
+    int to[3] = {277299251, 292820169, 609217};
 
-    if (!route) {
-        printf("No route found.\n");
-    } else {
-        printf("Optimal route: %d nodes, %lf m\n", route->nrof_nodes, route->length);
-        for (i = 0; i < route->nrof_nodes; i++) {
-            printf("%d ", route->nodes[i].id);
+    for (i = 0; i < 3; i++) {
+        printf("Test route from %d to %d\n", from[i], to[i]);
+        route = ww_routing_astar(&ri, from[i], to[i]);
+        if (!route) {
+            printf("No route found.\n");
+        } else {
+            printf("Optimal route: %d nodes, %lf m\n", route->nrof_nodes, route->length);
+            int k;
+            for (k = 0; k < route->nrof_nodes; k++) {
+                printf("%d ", route->nodes[k].id);
+            }
+            printf("\n");
         }
-        printf("\n");
     }
     
     //for (i = 0; i < 10; i++)

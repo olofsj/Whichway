@@ -90,20 +90,16 @@ Route * reconstruct_path(AStarScore *score) {
         sc = sc->came_from;
     }
 
-    printf("Path length: %d %lf\n", res->nrof_nodes, res->length);
-
     res->nodes = malloc(res->nrof_nodes * sizeof(RoutingNode));
     res->nodes[res->nrof_nodes-1].id = score->way->from.id;
     res->nodes[res->nrof_nodes-1].lat = score->way->from.lat;
     res->nodes[res->nrof_nodes-1].lon = score->way->from.lon;
-    printf("Node %d: %d\n", res->nrof_nodes-1, res->nodes[res->nrof_nodes-1].id);
     sc = score;
     int i = res->nrof_nodes-2;
     while (sc->came_from) {
         res->nodes[i].id = sc->came_from->way->from.id;
         res->nodes[i].lat = sc->came_from->way->from.lat;
         res->nodes[i].lon = sc->came_from->way->from.lon;
-        printf("Node %d: %d\n", i, res->nodes[i].id);
         sc = sc->came_from;
         i--;
     }
@@ -112,11 +108,13 @@ Route * reconstruct_path(AStarScore *score) {
 }
 
 Route * ww_routing_astar(RoutingIndex *ri, int from_id, int to_id) {
-    List *closedset, *openset;
+    List *closedset, *openset, *l;
     AStarScore *sc;
     RoutingNode *from, *to;
     int from_index, to_index;
+    Route *result = NULL;
 
+    // Find the start and end nodes in the index
     from_index = routing_index_find_node(ri, from_id);
     to_index = routing_index_find_node(ri, to_id);
     from = &(ri->ways[from_index].from);
@@ -128,6 +126,7 @@ Route * ww_routing_astar(RoutingIndex *ri, int from_id, int to_id) {
     if (from_index < 0 || to_index < 0)
         return NULL;
 
+    // Set up the score for the start node
     sc = malloc(sizeof(AStarScore));
     sc->index = routing_index_find_node(ri, from_id);
     sc->way = &(ri->ways[sc->index]);
@@ -135,73 +134,58 @@ Route * ww_routing_astar(RoutingIndex *ri, int from_id, int to_id) {
     sc->g = 0;
     sc->h = distance(from->lat, from->lon, to->lat, to->lon);
     sc->f = sc->h;
-    printf("Start node f = %lf\n", sc->f);
 
+    // Set up the lists of open and closed nodes
     closedset = NULL;
     openset = list_prepend(NULL, sc);
-    printf("List size = %d\n", list_count(openset));
 
+    // Loop until there are no more nodes in the open set
     while (openset) {
-        printf("openset size = %d\n", list_count(openset));
-        printf("closedset size = %d\n", list_count(closedset));
         sc = pop_min_f_from_list(&openset);
-        printf("Node %d f = %lf\n", sc->way->from.id, sc->f);
-
-        if (sc->way->from.id == to->id) {
-            printf("Optimal route found\n");
-            // Found the optimal route
-            Route *result = reconstruct_path(sc);
-
-            // Clean up
-            free(sc);
-            List *l = openset;
-            while (l) {
-                List *ll = l->next;
-                free(l->data);
-                free(l);
-                l = ll;
-            }
-            l = closedset;
-            while (l) {
-                List *ll = l->next;
-                free(l->data);
-                free(l);
-                l = ll;
-            }
-
-            return result;
-        }
-
         closedset = list_prepend(closedset, sc);
 
-        printf("openset size = %d\n", list_count(openset));
-        printf("closedset size = %d\n", list_count(closedset));
+        if (sc->way->from.id == to->id) {
+            // Found the optimal route
+            result = reconstruct_path(sc);
 
-        RoutingWay *w = sc->way;
-        int w_index = sc->index;
-        while (w_index < ri->size && w->from.id == sc->way->from.id && w->next >= 0) {
-            printf("%d %d\n", w->from.id, w->next);
-            printf("%d %d\n", w->from.id, ri->ways[w->next].from.id);
+            // Finished, goto the end for cleanup
+            goto end;
+        }
+
+
+        // Check all the nodes connected to this node
+        int w_index;
+        for (w_index = sc->index; w_index < ri->size && (ri->ways[w_index].from.id == sc->way->from.id); w_index++) {
+            RoutingWay *w = &(ri->ways[w_index]);
+
+            if (w->next < 0)
+                continue;
+
             AStarScore *sc2 = malloc(sizeof(AStarScore));
             sc2->index = w->next;
             sc2->way = &(ri->ways[sc2->index]);
 
+            // Check if node is in closed set, if so skip it
             if (list_find(closedset, sc2, score_compare_cb)) {
                 free(sc2);
-                w = &(ri->ways[++w_index]);
                 continue;
             }
 
+            // Calculate the tentative new score
             double tentative_g_score = sc->g + distance(w->from.lat, w->from.lon, 
                     ri->ways[w->next].from.lat, ri->ways[w->next].from.lon);
             
+
+            // Is it better than the previous best path?
             int tentative_is_better = 0;
 
-            List *l = list_find(openset, sc2, score_compare_cb);
+            l = list_find(openset, sc2, score_compare_cb);
             if (!l) {
+                // Node not previously visited
                 openset = list_prepend(openset, sc2);
                 tentative_is_better = 1;
             } else {
+                // Node visited, check if new path is better
                 free(sc2);
                 sc2 = l->data;
                 if (tentative_g_score < sc2->g) {
@@ -209,21 +193,19 @@ Route * ww_routing_astar(RoutingIndex *ri, int from_id, int to_id) {
                 }
             }
 
+            // If new path is better, update the score
             if (tentative_is_better == 1) {
                 sc2->came_from = sc;
                 sc2->g = tentative_g_score;
                 sc2->h = distance(w->from.lat, w->from.lon, to->lat, to->lon);
                 sc2->f = sc2->g + sc2->f;
             }
-
-            w = &(ri->ways[++w_index]);
         }
     }
  
-    // No route found
-
+end:
     // Clean up
-    List *l = openset;
+    l = openset;
     while (l) {
         List *ll = l->next;
         free(l->data);
@@ -238,7 +220,7 @@ Route * ww_routing_astar(RoutingIndex *ri, int from_id, int to_id) {
         l = ll;
     }
 
-    return NULL;
+    return result;
 
 }
 

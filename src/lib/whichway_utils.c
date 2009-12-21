@@ -117,23 +117,23 @@ int list_count(List *list) {
     return count;
 }
 
-int routing_index_bsearch(RoutingWay* ways, int id, int low, int high) {
+int routing_index_bsearch(RoutingNode* nodes, int id, int low, int high) {
     int mid;
 
     if (high < low)
         return -1; // not found
 
     mid = low + ((high - low) / 2);
-    if (ways[mid].from.id > id) {
-        return routing_index_bsearch(ways, id, low, mid-1);
-    } else if (ways[mid].from.id < id) {
-        return routing_index_bsearch(ways, id, mid+1, high);
+    if (nodes[mid].id > id) {
+        return routing_index_bsearch(nodes, id, low, mid-1);
+    } else if (nodes[mid].id < id) {
+        return routing_index_bsearch(nodes, id, mid+1, high);
     } else {
         return mid;
     }
 }
 
 int routing_index_find_node(RoutingIndex* ri, int id) {
-    return routing_index_bsearch(ri->ways, id, 0, ri->size-1);
+    return routing_index_bsearch(ri->nodes, id, 0, ri->nrof_nodes-1);
 }
 

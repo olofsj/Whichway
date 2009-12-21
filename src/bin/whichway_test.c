@@ -52,38 +52,38 @@ main(int argc, char **argv)
     }
 
     printf("filesize: %d\n", routingfile.size);
-    printf("sizeof(rw): %d\n", (int)sizeof(RoutingWay));
 
-    ri.size = routingfile.size/sizeof(RoutingWay);
-    ri.ways = (RoutingWay *)routingfile.content;
+    int *p;
+    p = (int *)routingfile.content;
+    ri.nrof_ways = *p++;
 
+    ri.nrof_nodes = *p++;
 
-    /*
-    printf("Number of ways: %d\n", ri.size);
-    for (i = 0; i < 2; i++) {
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) [%d %d %d] %lf\n", i, 
-                ri.ways[i].from.id, ri.ways[i].from.lat, ri.ways[i].from.lon, 
-                ri.ways[i].to.id, ri.ways[i].to.lat, ri.ways[i].to.lon,
-                ri.ways[ri.ways[i].next-1].from.id,
-                ri.ways[ri.ways[i].next].from.id,
-                ri.ways[ri.ways[i].next+1].from.id,
-                ri.ways[i].length);
-        int k = ri.size - 1 - i;
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) [%d %d %d] %lf\n", k, 
-                ri.ways[k].from.id, ri.ways[k].from.lat, ri.ways[k].from.lon, 
-                ri.ways[k].to.id, ri.ways[k].to.lat, ri.ways[k].to.lon,
-                ri.ways[ri.ways[k].next-1].from.id,
-                ri.ways[ri.ways[k].next].from.id,
-                ri.ways[ri.ways[k].next+1].from.id,
-                ri.ways[k].length);
+    RoutingWay *pw = (RoutingWay *)p;
+    ri.ways = pw;
+    pw = pw + ri.nrof_ways;
+
+    ri.nodes = (RoutingNode *)pw;
+
+    printf("Number of nodes: %d\n", ri.nrof_nodes);
+    printf("Number of ways: %d\n", ri.nrof_ways);
+
+    for (i = 0; i < 5; i++) {
+        printf("Way %d: %d (%lf %lf) - %d (%lf %lf)\n", i, 
+                ri.ways[i].from, ri.nodes[ri.ways[i].from].lat, ri.nodes[ri.ways[i].from].lon, 
+                ri.ways[i].next, ri.nodes[ri.ways[i].next].lat, ri.nodes[ri.ways[i].next].lon);
+        int k = ri.nrof_ways - 1 - i;
+        printf("Way %d: %d (%lf %lf) - %d (%lf %lf)\n", k, 
+                ri.ways[k].from, ri.nodes[ri.ways[k].from].lat, ri.nodes[ri.ways[k].from].lon, 
+                ri.ways[k].next, ri.nodes[ri.ways[k].next].lat, ri.nodes[ri.ways[k].next].lon);
     }
-    */
+
 
     Route *route;
-    int from[3] = {5499470, 292874624, 5499470};
-    int to[3] = {277299251, 292820169, 609217};
+    int from[] = {5499470, 292874624, 5499470, 292874624, 292874634, 424189, 424181};
+    int to[] = {277299251, 292820169, 609217, 523288845, 31659052, 424181, 424189};
 
-    for (i = 0; i < 3; i++) {
+    for (i = 0; i < 7; i++) {
         printf("Test route from %d to %d\n", from[i], to[i]);
         route = ww_routing_astar(&ri, from[i], to[i]);
         if (!route) {

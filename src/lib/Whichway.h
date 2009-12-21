@@ -15,7 +15,8 @@ typedef enum { no_smoothness, excellent, good, intermediate, bad, very_bad, horr
 
 
 struct _RoutingNode {
-    int id;
+    int id;       // OSM id
+    int way;      // The index of the first way leading from this node
     double lat;
     double lon;
 };
@@ -27,16 +28,16 @@ struct _Route {
 };
 
 struct _RoutingIndex {
-    int size;
+    int nrof_ways;
+    int nrof_nodes;
     RoutingWay *ways;
+    RoutingNode *nodes;
 };
 
 struct _RoutingWay {
-    RoutingNode from;
-    RoutingNode to;
+    int from; // The index of the node this way leads from
+    int next; // The index of the node this leads to
     TAG_HIGHWAY type;
-    double length;
-    int next;
 };
 
 

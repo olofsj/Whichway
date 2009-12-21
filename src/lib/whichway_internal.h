@@ -29,7 +29,7 @@ List * list_append(List *list, void *data);
 List * list_find(List *list, void *data, List_Compare_Cb compare);
 int list_count(List *list);
 
-int routing_index_bsearch(RoutingWay* ways, int id, int low, int high);
+int routing_index_bsearch(RoutingNode* nodes, int id, int low, int high);
 int routing_index_find_node(RoutingIndex* ri, int id);
 
 #endif /* WHICHWAY_INTERNAL_H_ */

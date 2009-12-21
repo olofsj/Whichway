@@ -13,7 +13,6 @@
 
 typedef struct _WayNode WayNode;
 typedef struct _Way Way;
-typedef struct _Node Node;
 
 struct _WayNode {
     int id;
@@ -29,13 +28,6 @@ struct _Way {
     TAG_HIGHWAY type;
 };
 
-struct _Node {
-    int id;
-    double lat;
-    double lon;
-    int ways;
-};
-
 char *TAG_HIGHWAY_VALUES[] = { "no", "motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link", "secondary", "secondary_link", "tertiary", "unclassified", "road", "residential", "living_street", "service", "track", "pedestrian", "raceway", "services", "bus_guideway", "path", "cycleway", "footway", "bridleway", "byway", "steps", "mini_roundabout", "stop", "traffic_signals", "crossing", "motorway_junction", "incline", "incline_steep", "ford", "bus_stop", "turning_circle", "construction", "proposed", "emergency_access_point", "speed_camera" };
 #define NROF_TAG_HIGHWAY_VALUES 40
 char *TAG_TRAFFIC_CALMING_VALUES[] = { "no", "yes", "bump", "chicane", "cushion", "hump", "rumble_strip", "table", "choker" };
@@ -43,25 +35,23 @@ char *TAG_TRAFFIC_CALMING_VALUES[] = { "no", "yes", "bump", "chicane", "cushion"
 char *TAG_SMOOTHNESS_VALUES[] = { "no", "excellent", "good", "intermediate", "bad", "very_bad", "horrible", "very_horrible", "impassable" };
 #define NROF_TAG_SMOOTHNESS_VALUES 9
 
-TAG_HIGHWAY used_highways[] = {secondary, secondary_link, tertiary, unclassified, road, residential, living_street, service, track, pedestrian, path, cycleway, footway, byway};
-int nrof_used_highways = 14;
+TAG_HIGHWAY used_highways[] = { motorway, motorway_link, trunk, trunk_link, primary, primary_link, secondary, secondary_link, tertiary, unclassified, road, residential, living_street, service, track, pedestrian, services, path, cycleway, footway, bridleway, byway };
+int nrof_used_highways = 22;
 
 /* Global variables */
 int depth;
 int node_count;
 List *node_list;
-Node **nodes;
-Node **nodes_ways_from;
-Node **nodes_ways_to;
-int way_count;
+RoutingNode **nodes;
+List *way_list;
 RoutingIndex ri;
 Way way;
 
 int
 node_sort_cb(const void *n1, const void *n2)
 {
-    const Node *m1 = NULL;
-    const Node *m2 = NULL;
+    const RoutingNode *m1 = NULL;
+    const RoutingNode *m2 = NULL;
 
     if (!n1) return(1);
     if (!n2) return(-1);
@@ -88,15 +78,15 @@ way_sort_cb(const void *n1, const void *n2)
     m1 = n1;
     m2 = n2;
 
-    if (m1->from.id > m2->from.id)
+    if (m1->from > m2->from)
         return 1;
-    if (m1->from.id < m2->from.id)
+    if (m1->from < m2->from)
         return -1;
     return 0;
 }
 
-Node *
-node_find(Node** nodes, int id, int low, int high) {
+RoutingNode *
+node_find(RoutingNode** nodes, int id, int low, int high) {
     int mid;
 
     if (high < low)
@@ -112,7 +102,7 @@ node_find(Node** nodes, int id, int low, int high) {
     }
 }
 
-Node *get_node(int id) {
+RoutingNode *get_node(int id) {
     return node_find(nodes, id, 0, node_count-1);
 }
 
@@ -122,12 +112,12 @@ nodeparser_start(void *data, const char *el, const char **attr) {
   int i;
 
   if (!strcmp(el, "node")) {
-      Node *node;
+      RoutingNode *node;
 
       node_count++;
 
-      node = malloc(sizeof(Node));
-      node->ways = 0;
+      node = malloc(sizeof(RoutingNode));
+      node->way = 0;
 
       /* Check all the attributes for this node */
       for (i = 0; attr[i]; i += 2) {
@@ -208,83 +198,52 @@ void
 wayparser_end(void *data, const char *el) {
     int i, index;
     WayNode *cn;
-    Node *nd;
+    RoutingNode *nd;
 
     if (!strcmp(el, "way")) {
         for (i = 0; i < nrof_used_highways; i++) {
+            // Add the parsed way into the list of ways
             if (used_highways[i] == way.type) {
-                way_count++;
-
-                // Add the parsed way into the routing index
-                index = ri.size;
 
                 if (way.oneway)
-                    ri.size = ri.size + (way.size-1);
+                    ri.nrof_ways = ri.nrof_ways + (way.size-1);
                 else 
-                    ri.size = ri.size + 2*(way.size-1);
-                ri.ways = realloc(ri.ways, ri.size * sizeof(RoutingWay));
+                    ri.nrof_ways = ri.nrof_ways + 2*(way.size-1);
 
+                // Add each segment of the way into the index
                 cn = way.start;
                 while (cn->next) {
-                    ri.ways[index].type = way.type;
-                    ri.ways[index].from.id = cn->id;
-                    ri.ways[index].to.id = cn->next->id;
+                    RoutingWay *w = malloc(sizeof(RoutingWay));
 
-                    nd = get_node(ri.ways[index].from.id);
-                    if (nd) {
-                        ri.ways[index].from.lat = nd->lat;
-                        ri.ways[index].from.lon = nd->lon;
-                    }
-                    // Store pointer for easy access later
-                    nodes_ways_from = realloc(nodes_ways_from, (index+1)*sizeof(Node *));
-                    nodes_ways_from[index] = nd;
-                    nd->ways++;
+                    w->type = way.type;
+                    w->from = cn->id;
+                    w->next = cn->next->id;
+                    way_list = list_sorted_insert(way_list, w, way_sort_cb);
 
-                    nd = get_node(ri.ways[index].to.id);
-                    if (nd) {
-                        ri.ways[index].to.lat = nd->lat;
-                        ri.ways[index].to.lon = nd->lon;
-                    }
-                    // Store pointer for easy access later
-                    nodes_ways_to = realloc(nodes_ways_to, (index+1)*sizeof(Node *));
-                    nodes_ways_to[index] = nd;
-                    nd->ways++;
+                    // Mark nodes as used
+                    nd = get_node(cn->id);
+                    if (nd)
+                        nd->way++;
+                    nd = get_node(cn->next->id);
+                    if (nd)
+                        nd->way++;
 
-                    ri.ways[index].length = distance(
-                            ri.ways[index].from.lat,
-                            ri.ways[index].from.lon,
-                            ri.ways[index].to.lat,
-                            ri.ways[index].to.lon);
-
-                    index++;
-
+                    // if not oneway, add the reverse way as well
                     if (!way.oneway) {
-                        ri.ways[index].type = way.type;
-                        ri.ways[index].from.id = cn->next->id;
-                        ri.ways[index].to.id = cn->id;
+                        RoutingWay *w = malloc(sizeof(RoutingWay));
 
-                        nd = get_node(ri.ways[index].from.id);
-                        if (nd) {
-                            ri.ways[index].from.lat = nd->lat;
-                            ri.ways[index].from.lon = nd->lon;
-                        }
-                        // Store pointer for easy access later
-                        nodes_ways_from = realloc(nodes_ways_from, (index+1)*sizeof(Node *));
-                        nodes_ways_from[index] = nd;
-                        nd->ways++;
+                        w->type = way.type;
+                        w->from = cn->next->id;
+                        w->next = cn->id;
+                        way_list = list_sorted_insert(way_list, w, way_sort_cb);
 
-                        nd = get_node(ri.ways[index].to.id);
-                        if (nd) {
-                            ri.ways[index].to.lat = nd->lat;
-                            ri.ways[index].to.lon = nd->lon;
-                        }
-                        // Store pointer for easy access later
-                        nodes_ways_to = realloc(nodes_ways_to, (index+1)*sizeof(Node *));
-                        nodes_ways_to[index] = nd;
-                        nd->ways++;
-
-                        ri.ways[index].length = ri.ways[index-1].length;
-                        index++;
+                        // Mark nodes as used
+                        nd = get_node(cn->id);
+                        if (nd)
+                            nd->way++;
+                        nd = get_node(cn->next->id);
+                        if (nd)
+                            nd->way++;
                     }
 
                     cn = cn->next;
@@ -316,8 +275,9 @@ main(int argc, char **argv)
     int i;
     int done;
     int len;
-    List *cn;
-    RoutingWay *ways;
+    List *cn, *l;
+    RoutingWay *w;
+    RoutingNode *nd;
     
     
     printf("Whichway Create Index\n");
@@ -377,11 +337,11 @@ main(int argc, char **argv)
     }
 
     // Create an indexed sorted list of nodes
-    nodes = malloc(node_count * sizeof(Node *));
+    nodes = malloc(node_count * sizeof(RoutingNode *));
     i = 0;
     cn = node_list;
     while (cn) {
-        nodes[i++] = (Node *)(cn->data);
+        nodes[i++] = (RoutingNode *)(cn->data);
         cn = cn->next;
     }
 
@@ -395,12 +355,12 @@ main(int argc, char **argv)
     XML_SetElementHandler(wayparser, wayparser_start, wayparser_end);
 
     depth = 0;
-    way_count = 0;
-    ri.size = 0;
+    ri.nrof_ways = 0;
+    ri.nrof_nodes = 0;
     ri.ways = NULL;
+    ri.nodes = NULL;
     way.size = -1;
-    nodes_ways_from = NULL;
-    nodes_ways_to = NULL;
+    way_list = NULL;
 
     /* Parse the XML document */
     if (! XML_Parse(wayparser, osmfile.content, osmfile.size, done)) {
@@ -413,29 +373,48 @@ main(int argc, char **argv)
     // Postprocess the routing index, ordering the ways and getting the 
     // index of the target way
 
-    // Create a sorted list of ways
-    List *list = NULL;
-    for (i = 0; i < ri.size; i++) {
-        RoutingWay *way = &(ri.ways[i]);
-        list = list_sorted_insert(list, way, way_sort_cb);
+    // Create a sorted list of nodes in the routing index
+    ri.nrof_nodes = 0;
+    l = node_list;
+    while (l) {
+        nd = l->data;
+        if (nd->way > 0) {
+            ri.nrof_nodes++;
+        }
+        l = l->next;
     }
 
-    // Update the routing index with this sorted list
-    ways = malloc(ri.size * sizeof(RoutingWay));
-    List *l = list;
+    ri.nodes = malloc(ri.nrof_nodes * sizeof(RoutingNode));
+
+    i = 0;
+    l = node_list;
+    while (l) {
+        nd = l->data;
+        if (nd->way > 0) {
+            nd->way = -1;
+            memcpy(&(ri.nodes[i]), nd, sizeof(RoutingNode));
+            i++;
+        }
+        l = l->next;
+    }
+
+    // Update the ways in the routing index with this sorted list of nodes
+    ri.ways = malloc(ri.nrof_ways * sizeof(RoutingWay));
+    l = way_list;
     i = 0;
     while (l) {
-        memcpy(&(ways[i]), l->data, sizeof(RoutingWay));
+        w = l->data;
+        w->from = routing_index_find_node(&ri, w->from);
+        w->next = routing_index_find_node(&ri, w->next);
+        memcpy(&(ri.ways[i]), w, sizeof(RoutingWay));
         l = l->next; i++;
     }
-    free(ri.ways);
-    ri.ways = ways;
 
-    // Update all elements with the index of the next node
-    for (i = 0; i < ri.size; i++) {
-        ri.ways[i].next = routing_index_find_node(&ri, ri.ways[i].to.id);
-        if (ri.ways[i].next < 0) {
-            printf("next node not found for id %d\n", ri.ways[i].to.id);
+    // Update the nodes in the index with the index of the first way 
+    // leading from that node
+    for (i = 0; i < ri.nrof_ways; i++) {
+        if (ri.nodes[ri.ways[i].from].way == -1) {
+            ri.nodes[ri.ways[i].from].way = i;
         }
     }
 
@@ -446,28 +425,30 @@ main(int argc, char **argv)
         fprintf(stderr, "Can't open output file for writing.\n");
         exit(-1);
     }
-    fwrite(ri.ways, sizeof(RoutingWay), ri.size, fp);
+    fwrite(&(ri.nrof_ways), sizeof(int), 1, fp);
+    fwrite(&(ri.nrof_nodes), sizeof(int), 1, fp);
+    fwrite(ri.ways, sizeof(RoutingWay), ri.nrof_ways, fp);
+    fwrite(ri.nodes, sizeof(RoutingNode), ri.nrof_nodes, fp);
     fclose(fp);
 
-    printf("Number of nodes: %d\n", node_count);
-    printf("Number of ways: %d\n", ri.size);
+    printf("Number of nodes: %d\n", ri.nrof_nodes);
+    printf("Number of ways: %d\n", ri.nrof_ways);
+
     for (i = 0; i < 5; i++) {
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) [%d %d %d] %lf: %s\n", i, 
-                ri.ways[i].from.id, ri.ways[i].from.lat, ri.ways[i].from.lon, 
-                ri.ways[i].to.id, ri.ways[i].to.lat, ri.ways[i].to.lon,
-                ri.ways[ri.ways[i].next-1].from.id,
-                ri.ways[ri.ways[i].next].from.id,
-                ri.ways[ri.ways[i].next+1].from.id,
-                ri.ways[i].length, TAG_HIGHWAY_VALUES[ri.ways[i].type]);
-        int k = ri.size - 1 - i;
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) [%d %d %d] %lf: %s\n", k, 
-                ri.ways[k].from.id, ri.ways[k].from.lat, ri.ways[k].from.lon, 
-                ri.ways[k].to.id, ri.ways[k].to.lat, ri.ways[k].to.lon,
-                ri.ways[ri.ways[k].next-1].from.id,
-                ri.ways[ri.ways[k].next].from.id,
-                ri.ways[ri.ways[k].next+1].from.id,
-                ri.ways[k].length, TAG_HIGHWAY_VALUES[ri.ways[k].type]);
+        printf("Node %d: %d (%lf %lf) %d\n", i, ri.nodes[i].id, ri.nodes[i].lat, ri.nodes[i].lon, ri.nodes[i].way);
+        printf("Way %d: %d (%lf %lf) - %d (%lf %lf): %s\n", i, 
+                ri.ways[i].from, ri.nodes[ri.ways[i].from].lat, ri.nodes[ri.ways[i].from].lon, 
+                ri.ways[i].next, ri.nodes[ri.ways[i].next].lat, ri.nodes[ri.ways[i].next].lon, 
+                TAG_HIGHWAY_VALUES[ri.ways[i].type]);
+        int k = ri.nrof_ways - 1 - i;
+        printf("Way %d: %d (%lf %lf) - %d (%lf %lf): %s\n", k, 
+                ri.ways[k].from, ri.nodes[ri.ways[k].from].lat, ri.nodes[ri.ways[k].from].lon, 
+                ri.ways[k].next, ri.nodes[ri.ways[k].next].lat, ri.nodes[ri.ways[k].next].lon, 
+                TAG_HIGHWAY_VALUES[ri.ways[k].type]);
+        k = ri.nrof_nodes - 1 - i;
+        printf("Node %d: %d (%lf %lf)\n", k, ri.nodes[k].id, ri.nodes[k].lat, ri.nodes[k].lon, ri.nodes[k].way);
     }
+
     //for (i = 0; i < 10; i++)
         //printf("Node %d: %d (%lf %lf)\n", i, nodes[i]->id, nodes[i]->lat, nodes[i]->lon);
 }

@@ -57,6 +57,81 @@ List * list_sorted_insert(List *list, void *data, List_Compare_Cb compare) {
     return list;
 }
 
+List * list_sorted_merge(List *list1, List *list2, List_Compare_Cb compare) {
+    List *l, *result;
+
+    if (!list1)
+        return list2;
+    if (!list2)
+        return list1;
+
+    // Get the start of the resulting list
+    if (compare(list1->data, list2->data) <= 0) {
+        result = list1;
+        l = list1;
+        list1 = list1->next;
+    } else {
+        result = list2;
+        l = list2;
+        list2 = list2->next;
+    }
+
+    // Merge the two lists
+    while (list1 && list2) {
+        if (compare(list1->data, list2->data) <= 0) {
+            l->next = list1;
+            list1->prev = l;
+            list1 = list1->next;
+        } else {
+            l->next = list2;
+            list2->prev = l;
+            list2 = list2->next;
+        }
+        l = l->next;
+    }
+
+    // Add the remaining tail
+    if (list1) {
+        l->next = list1;
+        list1->prev = l;
+    }
+
+    if (list2) {
+        l->next = list2;
+        list2->prev = l;
+    }
+
+    return result;
+}
+
+List * list_merge_sort(List *list, int size, List_Compare_Cb compare) {
+    List *right, *left, *result;
+    int i;
+
+    if (size <= 1)
+        return list;
+
+    // Split the list into two halves
+    left = list;
+    right = list;
+    for (i = 0; i < size/2; i++)
+        right = right->next;
+
+    right->prev->next = NULL;
+    right->prev = NULL;
+
+    // Sort the halves separately
+    left = list_merge_sort(left, size/2, compare);
+    right = list_merge_sort(right, (size+1)/2, compare);
+
+    // Merge the sorted halves
+    return list_sorted_merge(left, right, compare);
+}
+
+List * list_sort(List *list, List_Compare_Cb compare) {
+    return list_merge_sort(list, list_count(list), compare);
+}
+
 List * list_prepend(List *list, void *data) {
     List *l;
 

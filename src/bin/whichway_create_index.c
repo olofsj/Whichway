@@ -129,7 +129,7 @@ nodeparser_start(void *data, const char *el, const char **attr) {
               sscanf(attr[i+1], "%lf", &(node->lon));
       }
 
-      node_list = list_sorted_insert(node_list, node, node_sort_cb);
+      node_list = list_prepend(node_list, node);
   }
 
   depth++;
@@ -218,7 +218,7 @@ wayparser_end(void *data, const char *el) {
                     w->type = way.type;
                     w->from = cn->id;
                     w->next = cn->next->id;
-                    way_list = list_sorted_insert(way_list, w, way_sort_cb);
+                    way_list = list_prepend(way_list, w);
 
                     // Mark nodes as used
                     nd = get_node(cn->id);
@@ -235,7 +235,7 @@ wayparser_end(void *data, const char *el) {
                         w->type = way.type;
                         w->from = cn->next->id;
                         w->next = cn->id;
-                        way_list = list_sorted_insert(way_list, w, way_sort_cb);
+                        way_list = list_prepend(way_list, w);
 
                         // Mark nodes as used
                         nd = get_node(cn->id);
@@ -337,6 +337,8 @@ main(int argc, char **argv)
     }
 
     // Create an indexed sorted list of nodes
+    node_list = list_sort(node_list, node_sort_cb);
+    
     nodes = malloc(node_count * sizeof(RoutingNode *));
     i = 0;
     cn = node_list;
@@ -374,6 +376,7 @@ main(int argc, char **argv)
     // index of the target way
 
     // Create a sorted list of nodes in the routing index
+    way_list = list_sort(way_list, way_sort_cb);
     ri.nrof_nodes = 0;
     l = node_list;
     while (l) {

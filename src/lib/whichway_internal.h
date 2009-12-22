@@ -24,6 +24,9 @@ struct _List {
 
 double distance(double from_lat, double from_lon, double to_lat, double to_lon);
 List * list_sorted_insert(List *list, void *data, List_Compare_Cb compare);
+List * list_sorted_merge(List *list1, List *list2, List_Compare_Cb compare);
+List * list_merge_sort(List *list, int size, List_Compare_Cb compare);
+List * list_sort(List *list, List_Compare_Cb compare);
 List * list_prepend(List *list, void *data);
 List * list_append(List *list, void *data);
 List * list_find(List *list, void *data, List_Compare_Cb compare);

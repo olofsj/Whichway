@@ -1,5 +1,5 @@
 *.o
-*.edj
+*.pyc
 *.swp
 *~
 Makefile

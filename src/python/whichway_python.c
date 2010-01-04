@@ -32,6 +32,9 @@ static PyObject *find_route(whichway_Router *self, PyObject *args) {
     // Calculate route
     route = ww_routing_astar(self->routingindex, from_id, to_id);
 
+    if (!route)
+        return Py_BuildValue("[]");
+
     // Build return value
     list = PyList_New(0);
     for (k = 0; k < route->nrof_nodes; k++) {

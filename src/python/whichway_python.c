@@ -51,7 +51,7 @@ static PyObject *find_route(whichway_Router *self, PyObject *args) {
     route = ww_routing_astar(self->routingindex, from_id, to_id);
 
     if (!route)
-        return Py_BuildValue("{s:[],s:[],s:[]}", "ids", "lats","lons");
+        return Py_BuildValue("{s:[],s:[],s:[],s:d}", "ids", "lats","lons", "length", 0.0);
 
     // Build return value
     dict = PyDict_New();
@@ -66,6 +66,7 @@ static PyObject *find_route(whichway_Router *self, PyObject *args) {
     PyDict_SetItemString(dict, "ids", id_list);
     PyDict_SetItemString(dict, "lats", lat_list);
     PyDict_SetItemString(dict, "lons", lon_list);
+    PyDict_SetItemString(dict, "length", Py_BuildValue("d", route->length));
 
     return dict;
 }

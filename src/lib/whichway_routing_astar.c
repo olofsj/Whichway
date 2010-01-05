@@ -201,7 +201,7 @@ Route * ww_routing_astar(RoutingIndex *ri, int from_id, int to_id) {
                 sc2->came_from = sc;
                 sc2->g = tentative_g_score;
                 sc2->h = distance(sc2->node->lat, sc2->node->lon, to->lat, to->lon);
-                sc2->f = sc2->g + sc2->f;
+                sc2->f = sc2->g + sc2->h;
             }
         }
     }

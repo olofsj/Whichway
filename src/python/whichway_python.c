@@ -16,14 +16,32 @@ typedef struct {
     PyObject_HEAD
     /* Type-specific fields go here. */
     RoutingIndex *routingindex;
+    RoutingNode **nodes_sorted_by_lat;
     File *routingfile;
 } whichway_Router;
+
+static PyObject *find_closest_node(whichway_Router *self, PyObject *args) {
+    double lat, lon;
+    RoutingNode *closest;
+
+    // Get arguments
+    if (!PyArg_ParseTuple(args, "(dd)", &lat, &lon))
+        return NULL;
+
+    // Find closest node
+    closest = ww_find_closest_node(self->routingindex, self->nodes_sorted_by_lat, lat, lon);
+
+    if (!closest)
+        return NULL;
+
+    return Py_BuildValue("i", closest->id);
+}
 
 static PyObject *find_route(whichway_Router *self, PyObject *args) {
     int from_id, to_id;
     int k;
     Route *route;
-    PyObject *list;
+    PyObject *id_list, *lat_list, *lon_list, *dict;
 
     // Get arguments
     if (!PyArg_ParseTuple(args, "(ii)", &from_id, &to_id))
@@ -33,15 +51,23 @@ static PyObject *find_route(whichway_Router *self, PyObject *args) {
     route = ww_routing_astar(self->routingindex, from_id, to_id);
 
     if (!route)
-        return Py_BuildValue("[]");
+        return Py_BuildValue("{s:[],s:[],s:[]}", "ids", "lats","lons");
 
     // Build return value
-    list = PyList_New(0);
+    dict = PyDict_New();
+    id_list = PyList_New(0);
+    lat_list = PyList_New(0);
+    lon_list = PyList_New(0);
     for (k = 0; k < route->nrof_nodes; k++) {
-        PyList_Append(list, Py_BuildValue("i", route->nodes[k].id));
+        PyList_Append(id_list, Py_BuildValue("i", route->nodes[k].id));
+        PyList_Append(lat_list, Py_BuildValue("d", route->nodes[k].lat));
+        PyList_Append(lon_list, Py_BuildValue("d", route->nodes[k].lon));
     }
+    PyDict_SetItemString(dict, "ids", id_list);
+    PyDict_SetItemString(dict, "lats", lat_list);
+    PyDict_SetItemString(dict, "lons", lon_list);
 
-    return list;
+    return dict;
 }
 
 static int whichway_router_init(whichway_Router *self, PyObject *args, PyObject *kwds)
@@ -101,6 +127,8 @@ static int whichway_router_init(whichway_Router *self, PyObject *args, PyObject 
 
     self->routingindex->nodes = (RoutingNode *)pw;
 
+    self->nodes_sorted_by_lat = ww_nodes_get_sorted_by_lat(self->routingindex);
+
 	return 0;
 }
 
@@ -132,6 +160,7 @@ static void whichway_router_dealloc(whichway_Router *self)
 }
 
 static PyMethodDef whichway_router_methods[] = {
+    {"find_closest_node", (PyCFunction)find_closest_node, METH_VARARGS, "Find the node closest to a given coordinate"},
     {"find_route", (PyCFunction)find_route, METH_VARARGS, "Find the best route between two nodes"},
     {NULL, NULL, 0, NULL}
 };

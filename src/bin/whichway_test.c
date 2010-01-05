@@ -79,6 +79,7 @@ main(int argc, char **argv)
     }
 
 
+    // Test routing
     Route *route;
     int from[] = {5499470, 292874624, 5499470, 292874624, 292874634, 424189, 424181};
     int to[] = {277299251, 292820169, 609217, 523288845, 31659052, 424181, 424189};
@@ -98,7 +99,17 @@ main(int argc, char **argv)
         }
     }
     
-    //for (i = 0; i < 10; i++)
-        //printf("Node %d: %d (%lf %lf)\n", i, nodes[i]->id, nodes[i]->lat, nodes[i]->lon);
+    // Test finding closest nodes
+    RoutingNode **nodes_sorted_by_lat = ww_nodes_get_sorted_by_lat(&ri);
+
+    printf("Created list of nodes sorted by latitude.\n");
+
+    double lat, lon;
+    RoutingNode *nd;
+    lat = 59.4271;
+    lon = 17.837627433342;
+    nd = ww_find_closest_node(&ri, nodes_sorted_by_lat, lat, lon);
+
+    printf("Node closest to (%lf, %lf): %d (%lf, %lf)\n", lat, lon, nd->id, nd->lat, nd->lon);
 }
 

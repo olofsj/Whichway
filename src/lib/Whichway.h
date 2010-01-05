@@ -43,4 +43,8 @@ struct _RoutingWay {
 
 Route * ww_routing_astar(RoutingIndex *ri, int from_id, int to_id);
 
+RoutingNode * ww_find_closest_node(RoutingIndex *ri, RoutingNode **sorted_by_lat, double lat, double lon);
+
+RoutingNode ** ww_nodes_get_sorted_by_lat(RoutingIndex *ri);
+
 #endif /* WHICHWAY_H_ */

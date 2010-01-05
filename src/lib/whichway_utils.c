@@ -192,7 +192,7 @@ int list_count(List *list) {
     return count;
 }
 
-int routing_index_bsearch(RoutingNode* nodes, int id, int low, int high) {
+int routing_index_bsearch(RoutingNode *nodes, int id, int low, int high) {
     int mid;
 
     if (high < low)
@@ -208,7 +208,110 @@ int routing_index_bsearch(RoutingNode* nodes, int id, int low, int high) {
     }
 }
 
-int routing_index_find_node(RoutingIndex* ri, int id) {
+int routing_index_find_node(RoutingIndex *ri, int id) {
     return routing_index_bsearch(ri->nodes, id, 0, ri->nrof_nodes-1);
 }
 
+int min_lat_bsearch(RoutingNode **nodes, double lat, int low, int high) {
+    int mid;
+
+    if (high < low) {
+        return high; // no exact match, return closest
+    }
+
+    mid = low + ((high - low) / 2);
+    if (nodes[mid]->lat > lat) {
+        return min_lat_bsearch(nodes, lat, low, mid-1);
+    } else if (nodes[mid]->lat < lat) {
+        return min_lat_bsearch(nodes, lat, mid+1, high);
+    } else {
+        return mid;
+    }
+}
+
+int
+node_sort_by_lat_cb(const void *n1, const void *n2)
+{
+    const RoutingNode *m1 = NULL;
+    const RoutingNode *m2 = NULL;
+
+    if (!n1) return(1);
+    if (!n2) return(-1);
+
+    m1 = n1;
+    m2 = n2;
+
+    if (m1->lat > m2->lat)
+        return 1;
+    if (m1->lat < m2->lat)
+        return -1;
+    return 0;
+}
+
+RoutingNode ** ww_nodes_get_sorted_by_lat(RoutingIndex *ri) {
+    int i;
+    RoutingNode **nodes;
+    List *node_list, *cn;
+
+    node_list = NULL;
+    for (i = 0; i < ri->nrof_nodes; i++) {
+        node_list = list_prepend(node_list, &ri->nodes[i]);
+    }
+
+    node_list = list_sort(node_list, node_sort_by_lat_cb);
+    
+    nodes = malloc(ri->nrof_nodes * sizeof(RoutingNode *));
+    i = 0;
+    cn = node_list;
+    while (cn) {
+        nodes[i++] = (RoutingNode *)(cn->data);
+        cn = cn->next;
+    }
+
+    return nodes;
+}
+
+RoutingNode * ww_find_closest_node(RoutingIndex *ri, RoutingNode **sorted_by_lat, double lat, double lon) {
+
+    if (!sorted_by_lat) {
+        sorted_by_lat = ww_nodes_get_sorted_by_lat(ri);
+    }
+
+    int min_lat_index, i;
+    RoutingNode *nd, *closest;
+    double min_d;
+
+    min_lat_index = min_lat_bsearch(sorted_by_lat, lat, 0, ri->nrof_nodes-1);
+    if (min_lat_index < 0 || min_lat_index >= ri->nrof_nodes)
+        return NULL;
+
+    closest = sorted_by_lat[min_lat_index];
+    min_d = distance(lat, lon, closest->lat, closest->lon);
+
+    i = min_lat_index-1;
+    nd = sorted_by_lat[i];
+    while (i >= 0 && abs(nd->lat - lat) < min_d) {
+        double d;
+        d = distance(lat, lon, nd->lat, nd->lon);
+        if (d < min_d) {
+            closest = nd;
+            min_d = d;
+        }
+        nd = sorted_by_lat[--i];
+    }
+
+    i = min_lat_index+1;
+    nd = sorted_by_lat[i];
+    while (i < ri->nrof_nodes && abs(nd->lat - lat) < min_d) {
+        double d;
+        d = distance(lat, lon, nd->lat, nd->lon);
+        if (d < min_d) {
+            closest = nd;
+            min_d = d;
+        }
+        nd = sorted_by_lat[++i];
+    }
+
+    return closest;
+
+}

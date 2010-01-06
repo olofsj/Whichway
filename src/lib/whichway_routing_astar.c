@@ -108,7 +108,7 @@ Route * reconstruct_path(AStarScore *score) {
     return res;
 }
 
-Route * ww_routing_astar(RoutingIndex *ri, int from_id, int to_id) {
+Route * ww_routing_astar(RoutingIndex *ri, RoutingProfile *profile, int from_id, int to_id) {
     List *closedset, *openset, *l;
     AStarScore *sc;
     RoutingNode *from, *to;
@@ -162,6 +162,7 @@ Route * ww_routing_astar(RoutingIndex *ri, int from_id, int to_id) {
         int w_index;
         for (w_index = sc->node->way; (w_index < ri->nrof_ways) && (ri->ways[w_index].from == sc->n_index); w_index++) {
             RoutingWay *w = &(ri->ways[w_index]);
+            RoutingTagSet *tagset = (void *)ri->tagsets + w->tagset;
 
             AStarScore *sc2 = malloc(sizeof(AStarScore));
             sc2->n_index = w->next;
@@ -175,7 +176,7 @@ Route * ww_routing_astar(RoutingIndex *ri, int from_id, int to_id) {
             }
 
             // Calculate the tentative new score
-            double tentative_g_score = sc->g + distance(sc->node->lat, sc->node->lon, 
+            double tentative_g_score = sc->g + effective_distance(profile, tagset, sc->node->lat, sc->node->lon, 
                     sc2->node->lat, sc2->node->lon);
             
 

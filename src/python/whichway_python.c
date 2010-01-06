@@ -12,13 +12,36 @@
 #include <math.h>
 #include "whichway_internal.h"
 
+char *tag_keys[] = TAG_KEYS;
+char *tag_values[] = TAG_VALUES;
+
 typedef struct {
     PyObject_HEAD
     /* Type-specific fields go here. */
     RoutingIndex *routingindex;
     RoutingNode **nodes_sorted_by_lat;
+    RoutingProfile *profile;
     File *routingfile;
 } whichway_Router;
+
+static PyObject *set_penalty(whichway_Router *self, PyObject *args) {
+    char *key, *value;
+    int i;
+    double penalty;
+
+    // Get arguments
+    if (!PyArg_ParseTuple(args, "ssd", &key, &value, &penalty))
+        return NULL;
+    
+    for (i = 0; i < NROF_TAGS; i++) {
+        if ( !strcmp(key, tag_keys[i]) && !strcmp(value, tag_values[i])) {
+            self->profile->penalty[i] = penalty;
+            return Py_True;
+        }
+    }
+
+    return Py_False;
+}
 
 static PyObject *find_closest_node(whichway_Router *self, PyObject *args) {
     double lat, lon;
@@ -48,7 +71,7 @@ static PyObject *find_route(whichway_Router *self, PyObject *args) {
         return NULL;
 
     // Calculate route
-    route = ww_routing_astar(self->routingindex, from_id, to_id);
+    route = ww_routing_astar(self->routingindex, self->profile, from_id, to_id);
 
     if (!route)
         return Py_BuildValue("{s:[],s:[],s:[],s:d}", "ids", "lats","lons", "length", 0.0);
@@ -75,6 +98,7 @@ static int whichway_router_init(whichway_Router *self, PyObject *args, PyObject 
 {
     struct stat st;
     char *filename;
+    int i;
 
     // Get arguments
     if (!PyArg_ParseTuple(args, "s", &filename)) {
@@ -133,6 +157,12 @@ static int whichway_router_init(whichway_Router *self, PyObject *args, PyObject 
 
     self->nodes_sorted_by_lat = ww_nodes_get_sorted_by_lat(self->routingindex);
 
+    /* Set up a profile */
+    self->profile = malloc(sizeof(RoutingProfile));
+    for (i = 0; i < NROF_TAGS; i++) {
+        self->profile->penalty[i] = 1.0;
+    }
+
 	return 0;
 }
 
@@ -157,6 +187,9 @@ static void whichway_router_dealloc(whichway_Router *self)
         free(self->routingfile);
     }
 
+    if (self->profile) 
+        free(self->profile);
+
     if (self->routingindex)
         free(self->routingindex);
 
@@ -164,6 +197,7 @@ static void whichway_router_dealloc(whichway_Router *self)
 }
 
 static PyMethodDef whichway_router_methods[] = {
+    {"set_penalty", (PyCFunction)set_penalty, METH_VARARGS, "Set the penalty for a given tag"},
     {"find_closest_node", (PyCFunction)find_closest_node, METH_VARARGS, "Find the node closest to a given coordinate"},
     {"find_route", (PyCFunction)find_route, METH_VARARGS, "Find the best route between two nodes"},
     {NULL, NULL, 0, NULL}

@@ -7,6 +7,7 @@ typedef struct _Route Route;
 typedef struct _RoutingIndex RoutingIndex;
 typedef struct _RoutingWay RoutingWay;
 typedef struct _RoutingTagSet RoutingTagSet;
+typedef struct _RoutingProfile RoutingProfile;
 
 typedef enum { highway_motorway, highway_motorway_link, highway_trunk,
     highway_trunk_link, highway_primary, highway_primary_link,
@@ -25,6 +26,9 @@ typedef enum { highway_motorway, highway_motorway_link, highway_trunk,
     traffic_calming_choker, smoothness_excellent, smoothness_good,
     smoothness_intermediate, smoothness_bad, smoothness_very_bad,
     smoothness_horrible, smoothness_very_horrible, smoothness_impassable } TAG;
+#define TAG_KEYS { "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway", "traffic_calming", "traffic_calming", "traffic_calming", "traffic_calming", "traffic_calming", "traffic_calming", "traffic_calming", "traffic_calming", "smoothness", "smoothness", "smoothness", "smoothness", "smoothness", "smoothness", "smoothness", "smoothness" }
+#define TAG_VALUES { "motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link", "secondary", "secondary_link", "tertiary", "unclassified", "road", "residential", "living_street", "service", "track", "pedestrian", "raceway", "services", "bus_guideway", "path", "cycleway", "footway", "bridleway", "byway", "steps", "mini_roundabout", "stop", "traffic_signals", "crossing", "motorway_junction", "incline", "incline_steep", "ford", "bus_stop", "turning_circle", "construction", "proposed", "emergency_access_point", "speed_camera", "yes", "bump", "chicane", "cushion", "hump", "rumble_strip", "table", "choker", "excellent", "good", "intermediate", "bad", "very_bad", "horrible", "very_horrible", "impassable" }
+#define NROF_TAGS 55
 
 
 struct _RoutingNode {
@@ -59,7 +63,11 @@ struct _RoutingTagSet {
     TAG tags[0];
 };
 
-Route * ww_routing_astar(RoutingIndex *ri, int from_id, int to_id);
+struct _RoutingProfile {
+    double penalty[NROF_TAGS]; // A penalty for each tag
+};
+
+Route * ww_routing_astar(RoutingIndex *ri, RoutingProfile *profile, int from_id, int to_id);
 
 RoutingNode * ww_find_closest_node(RoutingIndex *ri, RoutingNode **sorted_by_lat, double lat, double lon);
 

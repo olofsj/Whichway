@@ -28,25 +28,8 @@ struct _Way {
     RoutingTagSet *tagset;
 };
 
-char *tag_keys[] = { "highway", "highway", "highway", "highway", "highway", "highway",
-    "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway",
-    "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway",
-    "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway",
-    "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway",
-    "highway", "traffic_calming", "traffic_calming", "traffic_calming",
-    "traffic_calming", "traffic_calming", "traffic_calming", "traffic_calming",
-    "traffic_calming", "smoothness", "smoothness", "smoothness", "smoothness",
-    "smoothness", "smoothness", "smoothness", "smoothness" };
-char *tag_values[] = { "motorway", "motorway_link", "trunk", "trunk_link", "primary",
-    "primary_link", "secondary", "secondary_link", "tertiary", "unclassified", "road",
-    "residential", "living_street", "service", "track", "pedestrian", "raceway", "services",
-    "bus_guideway", "path", "cycleway", "footway", "bridleway", "byway", "steps",
-    "mini_roundabout", "stop", "traffic_signals", "crossing", "motorway_junction",
-    "incline", "incline_steep", "ford", "bus_stop", "turning_circle", "construction",
-    "proposed", "emergency_access_point", "speed_camera", "yes", "bump", "chicane",
-    "cushion", "hump", "rumble_strip", "table", "choker", "excellent", "good", "intermediate",
-    "bad", "very_bad", "horrible", "very_horrible", "impassable" };
-#define NROF_TAGS 55
+char *tag_keys[] = TAG_KEYS;
+char *tag_values[] = TAG_VALUES;
 
 TAG used_highways[] = { highway_motorway, highway_motorway_link, highway_trunk,
     highway_trunk_link, highway_primary, highway_primary_link,

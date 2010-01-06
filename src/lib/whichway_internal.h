@@ -23,6 +23,8 @@ struct _List {
 };
 
 double distance(double from_lat, double from_lon, double to_lat, double to_lon);
+double effective_distance(RoutingProfile *profile, RoutingTagSet *tagset, 
+        double from_lat, double from_lon, double to_lat, double to_lon);
 List * list_sorted_insert(List *list, void *data, List_Compare_Cb compare);
 List * list_sorted_merge(List *list1, List *list2, List_Compare_Cb compare);
 List * list_merge_sort(List *list, int size, List_Compare_Cb compare);

@@ -18,6 +18,21 @@ double distance(double from_lat, double from_lon, double to_lat, double to_lon) 
     return R*sqrt(phi*phi + pow(cos(phi_m)*lambda, 2));
 }
 
+// Effective distance, with any penalties from the given profile
+double effective_distance(RoutingProfile *profile, RoutingTagSet *tagset, 
+        double from_lat, double from_lon, double to_lat, double to_lon) {
+    double dist;
+    int i;
+
+    dist = distance(from_lat, from_lon, to_lat, to_lon);
+
+    for (i = 0; i < tagset->size; i++) {
+        dist *= profile->penalty[tagset->tags[i]];
+    }
+
+    return dist;
+}
+
 List * list_sorted_insert(List *list, void *data, List_Compare_Cb compare) {
     List *cn;
     List *l;

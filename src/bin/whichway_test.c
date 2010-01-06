@@ -99,19 +99,27 @@ main(int argc, char **argv)
     int from[] = {5499470, 292874624, 5499470, 292874624, 292874634, 424189, 424181};
     int to[] = {277299251, 292820169, 609217, 523288845, 31659052, 424181, 424189};
 
+    RoutingProfile profile;
+    for (i = 0; i < NROF_TAGS; i++) {
+        profile.penalty[i] = 1.0;
+    }
+
     for (i = 0; i < 7; i++) {
         printf("Test route from %d to %d\n", from[i], to[i]);
-        route = ww_routing_astar(&ri, from[i], to[i]);
+        route = ww_routing_astar(&ri, &profile, from[i], to[i]);
         if (!route) {
             printf("No route found.\n");
         } else {
             printf("Optimal route: %d nodes, %lf m\n", route->nrof_nodes, route->length);
             int k;
+            /*
             for (k = 0; k < route->nrof_nodes; k++) {
                 printf("%d ", route->nodes[k].id);
             }
             printf("\n");
+            */
         }
+        printf("\n");
     }
     
     // Test finding closest nodes

@@ -11,6 +11,8 @@
 #include <math.h>
 #include "whichway_internal.h"
 
+#define BUFF_SIZE 1048576
+
 typedef struct _WayNode WayNode;
 typedef struct _Way Way;
 
@@ -329,6 +331,7 @@ int
 main(int argc, char **argv)
 {
     File osmfile;
+    FILE *osmfilepointer;
     struct stat st;
     char *filename, *outfilename;
     int i, j;
@@ -364,11 +367,10 @@ main(int argc, char **argv)
     }
     osmfile.size = st.st_size;
 
-    /* mmap file contents */
-    osmfile.content = mmap(NULL, osmfile.size, PROT_READ, MAP_SHARED, osmfile.fd, 0);
-    if ((osmfile.content == MAP_FAILED) || (osmfile.content  == NULL)) {
-        close(osmfile.fd);
-        return 0;
+    osmfilepointer = fopen(osmfile.file, "r");
+    if (!osmfilepointer) {
+        fprintf(stderr, "Can't open file\n");
+        exit(-1);
     }
 
     printf("filesize: %d\n", osmfile.size);
@@ -388,14 +390,34 @@ main(int argc, char **argv)
     node_list = NULL;
 
     /* Parse the XML document */
-    if (! XML_Parse(nodeparser, osmfile.content, osmfile.size, done)) {
-        fprintf(stderr, "Parse error at line %d:\n%s\n",
-                (int)XML_GetCurrentLineNumber(nodeparser),
-                XML_ErrorString(XML_GetErrorCode(nodeparser)));
-        exit(-1);
+    printf("Parsing nodes from XML file...\n");
+    for (;;) {
+        int bytes_read;
+        void *buff = XML_GetBuffer(nodeparser, BUFF_SIZE);
+        if (!buff) {
+            fprintf(stderr, "Couldn't allocate memory for buffer\n");
+            exit(-1);
+        }
+        bytes_read = fread(buff, 1, BUFF_SIZE, osmfilepointer);
+        if (bytes_read < 0) {
+            fprintf(stderr, "Can't read from file\n");
+            exit(-1);
+        }
+
+        if (! XML_ParseBuffer(nodeparser, bytes_read, bytes_read == 0)) {
+            fprintf(stderr, "Parse error at line %d:\n%s\n",
+                    (int)XML_GetCurrentLineNumber(nodeparser),
+                    XML_ErrorString(XML_GetErrorCode(nodeparser)));
+            exit(-1);
+        }
+
+        if (bytes_read == 0)
+            break;
     }
 
+
     // Create an indexed sorted list of nodes
+    printf("Sorting list of nodes...\n");
     node_list = list_sort(node_list, node_sort_cb);
     
     nodes = malloc(node_count * sizeof(RoutingNode *));
@@ -428,17 +450,38 @@ main(int argc, char **argv)
     nrof_tagsets = 0;
 
     /* Parse the XML document */
-    if (! XML_Parse(wayparser, osmfile.content, osmfile.size, done)) {
-        fprintf(stderr, "Parse error at line %d:\n%s\n",
-                (int)XML_GetCurrentLineNumber(wayparser),
-                XML_ErrorString(XML_GetErrorCode(wayparser)));
-        exit(-1);
+    printf("Parsing ways from XML file...\n");
+    fseek(osmfilepointer, 0, SEEK_SET);
+    for (;;) {
+        int bytes_read;
+        void *buff = XML_GetBuffer(wayparser, BUFF_SIZE);
+        if (!buff) {
+            fprintf(stderr, "Couldn't allocate memory for buffer\n");
+            exit(-1);
+        }
+        bytes_read = fread(buff, 1, BUFF_SIZE, osmfilepointer);
+        if (bytes_read < 0) {
+            fprintf(stderr, "Can't read from file\n");
+            exit(-1);
+        }
+
+        if (! XML_ParseBuffer(wayparser, bytes_read, bytes_read == 0)) {
+            fprintf(stderr, "Parse error at line %d:\n%s\n",
+                    (int)XML_GetCurrentLineNumber(nodeparser),
+                    XML_ErrorString(XML_GetErrorCode(nodeparser)));
+            exit(-1);
+        }
+
+        if (bytes_read == 0)
+            break;
     }
+
 
     // Postprocess the routing index, ordering the ways and getting the 
     // index of the target way
 
-    // Create a sorted list of nodes in the routing index
+    // Create a sorted list of ways in the routing index
+    printf("Sorting list of ways...\n");
     way_list = list_sort(way_list, way_sort_cb);
     ri.nrof_nodes = 0;
     l = node_list;
@@ -465,6 +508,7 @@ main(int argc, char **argv)
     }
 
     // Update the ways in the routing index with this sorted list of nodes
+    printf("Updating way index references...\n");
     ri.ways = malloc(ri.nrof_ways * sizeof(RoutingWay));
     l = way_list;
     i = 0;
@@ -478,6 +522,7 @@ main(int argc, char **argv)
 
     // Update the nodes in the index with the index of the first way 
     // leading from that node
+    printf("Updating node index references...\n");
     for (i = 0; i < ri.nrof_ways; i++) {
         if (ri.nodes[ri.ways[i].from].way == -1) {
             ri.nodes[ri.ways[i].from].way = i;
@@ -485,6 +530,7 @@ main(int argc, char **argv)
     }
 
     // Write the routing index to disk
+    printf("Writing to disk...\n");
     FILE *fp;
     fp = fopen(outfilename, "w");
     if (!fp) {

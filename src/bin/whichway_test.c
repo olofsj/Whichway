@@ -16,7 +16,7 @@ main(int argc, char **argv)
     File routingfile;
     struct stat st;
     char *filename, *outfilename;
-    int i;
+    int i, j;
     RoutingIndex ri;
     
     
@@ -65,17 +65,32 @@ main(int argc, char **argv)
 
     ri.nodes = (RoutingNode *)pw;
 
+    ri.tagsets = (RoutingTagSet *)(ri.nodes + ri.nrof_nodes);
+
+
     printf("Number of nodes: %d\n", ri.nrof_nodes);
     printf("Number of ways: %d\n", ri.nrof_ways);
 
     for (i = 0; i < 5; i++) {
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf)\n", i, 
+        RoutingTagSet *ts;
+        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) : ", i, 
                 ri.ways[i].from, ri.nodes[ri.ways[i].from].lat, ri.nodes[ri.ways[i].from].lon, 
                 ri.ways[i].next, ri.nodes[ri.ways[i].next].lat, ri.nodes[ri.ways[i].next].lon);
+        ts = (void *)ri.tagsets + ri.ways[i].tagset;
+        for (j = 0; j < ts->size; j++) {
+            printf("%d ", ts->tags[j]);
+        }
+        printf("\n");
+        
         int k = ri.nrof_ways - 1 - i;
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf)\n", k, 
+        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) : ", k, 
                 ri.ways[k].from, ri.nodes[ri.ways[k].from].lat, ri.nodes[ri.ways[k].from].lon, 
                 ri.ways[k].next, ri.nodes[ri.ways[k].next].lat, ri.nodes[ri.ways[k].next].lon);
+        ts = (void *)ri.tagsets + ri.ways[k].tagset;
+        for (j = 0; j < ts->size; j++) {
+            printf("%d ", ts->tags[j]);
+        }
+        printf("\n");
     }
 
 

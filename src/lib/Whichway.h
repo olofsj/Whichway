@@ -6,12 +6,25 @@ typedef struct _RoutingNode RoutingNode;
 typedef struct _Route Route;
 typedef struct _RoutingIndex RoutingIndex;
 typedef struct _RoutingWay RoutingWay;
+typedef struct _RoutingTagSet RoutingTagSet;
 
-typedef enum { no_highway, motorway, motorway_link, trunk, trunk_link, primary, primary_link, secondary, secondary_link, tertiary, unclassified, road, residential, living_street, service, track, pedestrian, raceway, services, bus_guideway, path, cycleway, footway, bridleway, byway, steps, mini_roundabout, stop, traffic_signals, crossing, motorway_junction, incline, incline_steep, ford, bus_stop, turning_circle, construction, proposed, emergency_access_point, speed_camera } TAG_HIGHWAY;
-
-typedef enum { no_traffic_calming, yes, bump, chicane, cushion, hump, rumble_strip, table, choker } TAG_TRAFFIC_CALMING;
-
-typedef enum { no_smoothness, excellent, good, intermediate, bad, very_bad, horrible, very_horrible, impassable } TAG_SMOOTHNESS;
+typedef enum { highway_motorway, highway_motorway_link, highway_trunk,
+    highway_trunk_link, highway_primary, highway_primary_link,
+    highway_secondary, highway_secondary_link, highway_tertiary,
+    highway_unclassified, highway_road, highway_residential,
+    highway_living_street, highway_service, highway_track, highway_pedestrian,
+    highway_raceway, highway_services, highway_bus_guideway, highway_path,
+    highway_cycleway, highway_footway, highway_bridleway, highway_byway,
+    highway_steps, highway_mini_roundabout, highway_stop,
+    highway_traffic_signals, highway_crossing, highway_motorway_junction,
+    highway_incline, highway_incline_steep, highway_ford, highway_bus_stop,
+    highway_turning_circle, highway_construction, highway_proposed,
+    highway_emergency_access_point, highway_speed_camera, traffic_calming_yes,
+    traffic_calming_bump, traffic_calming_chicane, traffic_calming_cushion,
+    traffic_calming_hump, traffic_calming_rumble_strip, traffic_calming_table,
+    traffic_calming_choker, smoothness_excellent, smoothness_good,
+    smoothness_intermediate, smoothness_bad, smoothness_very_bad,
+    smoothness_horrible, smoothness_very_horrible, smoothness_impassable } TAG;
 
 
 struct _RoutingNode {
@@ -32,14 +45,19 @@ struct _RoutingIndex {
     int nrof_nodes;
     RoutingWay *ways;
     RoutingNode *nodes;
+    RoutingTagSet *tagsets;
 };
 
 struct _RoutingWay {
     int from; // The index of the node this way leads from
     int next; // The index of the node this leads to
-    TAG_HIGHWAY type;
+    int tagset;
 };
 
+struct _RoutingTagSet {
+    int size;
+    TAG tags[0];
+};
 
 Route * ww_routing_astar(RoutingIndex *ri, int from_id, int to_id);
 

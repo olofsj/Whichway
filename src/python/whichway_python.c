@@ -128,6 +128,9 @@ static int whichway_router_init(whichway_Router *self, PyObject *args, PyObject 
 
     self->routingindex->nodes = (RoutingNode *)pw;
 
+    self->routingindex->tagsets = (RoutingTagSet *)(self->routingindex->nodes
+            + self->routingindex->nrof_nodes);
+
     self->nodes_sorted_by_lat = ww_nodes_get_sorted_by_lat(self->routingindex);
 
 	return 0;

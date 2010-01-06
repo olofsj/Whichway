@@ -25,17 +25,36 @@ struct _Way {
     WayNode *end;
     int oneway;
     int size;
-    TAG_HIGHWAY type;
+    RoutingTagSet *tagset;
 };
 
-char *TAG_HIGHWAY_VALUES[] = { "no", "motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link", "secondary", "secondary_link", "tertiary", "unclassified", "road", "residential", "living_street", "service", "track", "pedestrian", "raceway", "services", "bus_guideway", "path", "cycleway", "footway", "bridleway", "byway", "steps", "mini_roundabout", "stop", "traffic_signals", "crossing", "motorway_junction", "incline", "incline_steep", "ford", "bus_stop", "turning_circle", "construction", "proposed", "emergency_access_point", "speed_camera" };
-#define NROF_TAG_HIGHWAY_VALUES 40
-char *TAG_TRAFFIC_CALMING_VALUES[] = { "no", "yes", "bump", "chicane", "cushion", "hump", "rumble_strip", "table", "choker" };
-#define NROF_TAG_TRAFFIC_CALMING_VALUES 9
-char *TAG_SMOOTHNESS_VALUES[] = { "no", "excellent", "good", "intermediate", "bad", "very_bad", "horrible", "very_horrible", "impassable" };
-#define NROF_TAG_SMOOTHNESS_VALUES 9
+char *tag_keys[] = { "highway", "highway", "highway", "highway", "highway", "highway",
+    "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway",
+    "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway",
+    "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway",
+    "highway", "highway", "highway", "highway", "highway", "highway", "highway", "highway",
+    "highway", "traffic_calming", "traffic_calming", "traffic_calming",
+    "traffic_calming", "traffic_calming", "traffic_calming", "traffic_calming",
+    "traffic_calming", "smoothness", "smoothness", "smoothness", "smoothness",
+    "smoothness", "smoothness", "smoothness", "smoothness" };
+char *tag_values[] = { "motorway", "motorway_link", "trunk", "trunk_link", "primary",
+    "primary_link", "secondary", "secondary_link", "tertiary", "unclassified", "road",
+    "residential", "living_street", "service", "track", "pedestrian", "raceway", "services",
+    "bus_guideway", "path", "cycleway", "footway", "bridleway", "byway", "steps",
+    "mini_roundabout", "stop", "traffic_signals", "crossing", "motorway_junction",
+    "incline", "incline_steep", "ford", "bus_stop", "turning_circle", "construction",
+    "proposed", "emergency_access_point", "speed_camera", "yes", "bump", "chicane",
+    "cushion", "hump", "rumble_strip", "table", "choker", "excellent", "good", "intermediate",
+    "bad", "very_bad", "horrible", "very_horrible", "impassable" };
+#define NROF_TAGS 55
 
-TAG_HIGHWAY used_highways[] = { motorway, motorway_link, trunk, trunk_link, primary, primary_link, secondary, secondary_link, tertiary, unclassified, road, residential, living_street, service, track, pedestrian, services, path, cycleway, footway, bridleway, byway };
+TAG used_highways[] = { highway_motorway, highway_motorway_link, highway_trunk,
+    highway_trunk_link, highway_primary, highway_primary_link,
+    highway_secondary, highway_secondary_link, highway_tertiary,
+    highway_unclassified, highway_road, highway_residential,
+    highway_living_street, highway_service, highway_track, highway_pedestrian,
+    highway_services, highway_path, highway_cycleway, highway_footway,
+    highway_bridleway, highway_byway };
 int nrof_used_highways = 22;
 
 /* Global variables */
@@ -46,6 +65,10 @@ RoutingNode **nodes;
 List *way_list;
 RoutingIndex ri;
 Way way;
+int *tagsetindex;
+RoutingTagSet *tagsets;
+int tagsetsize;
+int nrof_tagsets;
 
 int
 node_sort_cb(const void *n1, const void *n2)
@@ -150,7 +173,8 @@ wayparser_start(void *data, const char *el, const char **attr) {
       way.start = NULL;
       way.end = NULL;
       way.oneway = 0;
-      way.type = no_highway;
+      way.tagset = malloc(sizeof(RoutingTagSet));
+      way.tagset->size = 0;
   }
   else if (!strcmp(el, "tag") && way.size != -1) {
       if (!strcmp(attr[0], "k") && !strcmp(attr[1], "oneway") &&
@@ -159,13 +183,13 @@ wayparser_start(void *data, const char *el, const char **attr) {
           // Current way is oneway
           way.oneway = 1;
       }
-      if (!strcmp(attr[0], "k") && !strcmp(attr[1], "highway") &&
-              !strcmp(attr[2], "v")) {
-          // Highway tag
-          for (i = 0; i < NROF_TAG_HIGHWAY_VALUES; i++) {
-              if (!strcmp(attr[3], TAG_HIGHWAY_VALUES[i])) {
-                  way.type = i;
-              }
+      // Add recognized tags
+      for (i = 0; i < NROF_TAGS; i++) {
+          if (!strcmp(attr[0], "k") && !strcmp(attr[1], tag_keys[i]) &&
+                  !strcmp(attr[2], "v") && !strcmp(attr[3], tag_values[i])) {
+              way.tagset->size++;
+              way.tagset = realloc(way.tagset, sizeof(RoutingNode) + way.tagset->size*sizeof(TAG));
+              way.tagset->tags[way.tagset->size-1] = i;
           }
       }
   }
@@ -194,6 +218,56 @@ wayparser_start(void *data, const char *el, const char **attr) {
   depth++;
 }
 
+int way_type_is_used(Way way) {
+    int i,j;
+
+    for (i = 0; i < nrof_used_highways; i++) {
+        for (j = 0; j < way.tagset->size; j++) {
+            if (used_highways[i] == way.tagset->tags[j])
+                return 1;
+        }
+    }
+    
+    return 0;
+}
+
+int add_tagset_to_index(Way way) {
+    int i, j, k;
+    
+    // Check if such a tagset exists in the index
+    for (i = 0; i < nrof_tagsets; i++) {
+        RoutingTagSet *ts = (void *)tagsets + tagsetindex[i];
+        if (ts->size == way.tagset->size) {
+            int is_same = 1;
+            for (j = 0; j < way.tagset->size; j++) {
+                int has_tag = 0;
+                for (k = 0; k < ts->size; k++) {
+                    if (ts->tags[k] == way.tagset->tags[j])
+                        has_tag = 1;
+                }
+                if (has_tag == 0)
+                    is_same = 0;
+            }
+            if (is_same) 
+                return tagsetindex[i];
+        }
+    }
+
+    // Not found, add a new tagset to the end of the index
+    int newtagsetsize = tagsetsize + sizeof(RoutingTagSet) + way.tagset->size*sizeof(TAG);
+    tagsets = realloc(tagsets, newtagsetsize);
+
+    nrof_tagsets++;
+    tagsetindex = realloc(tagsetindex, nrof_tagsets*sizeof(int));
+    tagsetindex[nrof_tagsets-1] = tagsetsize;
+    RoutingTagSet *ts = (void *)tagsets + tagsetindex[nrof_tagsets-1];
+
+    memcpy(ts, way.tagset, sizeof(RoutingTagSet) + way.tagset->size*sizeof(TAG));
+    tagsetsize = newtagsetsize;
+
+    return tagsetindex[nrof_tagsets-1];
+}
+
 void
 wayparser_end(void *data, const char *el) {
     int i, index;
@@ -201,23 +275,42 @@ wayparser_end(void *data, const char *el) {
     RoutingNode *nd;
 
     if (!strcmp(el, "way")) {
-        for (i = 0; i < nrof_used_highways; i++) {
+        if (way_type_is_used(way)) {
+            // Add the tagset to the index
+            int tagset = add_tagset_to_index(way);
+
             // Add the parsed way into the list of ways
-            if (used_highways[i] == way.type) {
 
-                if (way.oneway)
-                    ri.nrof_ways = ri.nrof_ways + (way.size-1);
-                else 
-                    ri.nrof_ways = ri.nrof_ways + 2*(way.size-1);
+            if (way.oneway)
+                ri.nrof_ways = ri.nrof_ways + (way.size-1);
+            else 
+                ri.nrof_ways = ri.nrof_ways + 2*(way.size-1);
 
-                // Add each segment of the way into the index
-                cn = way.start;
-                while (cn->next) {
+            // Add each segment of the way into the index
+            cn = way.start;
+            while (cn->next) {
+                RoutingWay *w = malloc(sizeof(RoutingWay));
+
+                w->tagset = tagset;
+                w->from = cn->id;
+                w->next = cn->next->id;
+                way_list = list_prepend(way_list, w);
+
+                // Mark nodes as used
+                nd = get_node(cn->id);
+                if (nd)
+                    nd->way++;
+                nd = get_node(cn->next->id);
+                if (nd)
+                    nd->way++;
+
+                // if not oneway, add the reverse way as well
+                if (!way.oneway) {
                     RoutingWay *w = malloc(sizeof(RoutingWay));
 
-                    w->type = way.type;
-                    w->from = cn->id;
-                    w->next = cn->next->id;
+                    w->tagset = tagset;
+                    w->from = cn->next->id;
+                    w->next = cn->id;
                     way_list = list_prepend(way_list, w);
 
                     // Mark nodes as used
@@ -227,31 +320,14 @@ wayparser_end(void *data, const char *el) {
                     nd = get_node(cn->next->id);
                     if (nd)
                         nd->way++;
-
-                    // if not oneway, add the reverse way as well
-                    if (!way.oneway) {
-                        RoutingWay *w = malloc(sizeof(RoutingWay));
-
-                        w->type = way.type;
-                        w->from = cn->next->id;
-                        w->next = cn->id;
-                        way_list = list_prepend(way_list, w);
-
-                        // Mark nodes as used
-                        nd = get_node(cn->id);
-                        if (nd)
-                            nd->way++;
-                        nd = get_node(cn->next->id);
-                        if (nd)
-                            nd->way++;
-                    }
-
-                    cn = cn->next;
                 }
+
+                cn = cn->next;
             }
         }
 
         // Free the nodes
+        free(way.tagset);
         cn = way.start;
         while (cn) {
             WayNode *next;
@@ -272,7 +348,7 @@ main(int argc, char **argv)
     File osmfile;
     struct stat st;
     char *filename, *outfilename;
-    int i;
+    int i, j;
     int done;
     int len;
     List *cn, *l;
@@ -363,6 +439,10 @@ main(int argc, char **argv)
     ri.nodes = NULL;
     way.size = -1;
     way_list = NULL;
+    tagsets = NULL;
+    tagsetindex = NULL;
+    tagsetsize = 0;
+    nrof_tagsets = 0;
 
     /* Parse the XML document */
     if (! XML_Parse(wayparser, osmfile.content, osmfile.size, done)) {
@@ -432,22 +512,34 @@ main(int argc, char **argv)
     fwrite(&(ri.nrof_nodes), sizeof(int), 1, fp);
     fwrite(ri.ways, sizeof(RoutingWay), ri.nrof_ways, fp);
     fwrite(ri.nodes, sizeof(RoutingNode), ri.nrof_nodes, fp);
+    fwrite(tagsets, 1, tagsetsize, fp);
     fclose(fp);
 
     printf("Number of nodes: %d\n", ri.nrof_nodes);
     printf("Number of ways: %d\n", ri.nrof_ways);
 
+    
+    for (i = 0; i < nrof_tagsets; i++) {
+        RoutingTagSet *ts = (void *)tagsets + tagsetindex[i];
+        printf("tagsetindex[%d]->size = %d ", i, ts->size);
+        for (j = 0; j < ts->size; j++) {
+            printf("%s ", tag_values[ts->tags[j]]);
+        }
+        printf("\n");
+    }
+    
+
     for (i = 0; i < 5; i++) {
         printf("Node %d: %d (%lf %lf) %d\n", i, ri.nodes[i].id, ri.nodes[i].lat, ri.nodes[i].lon, ri.nodes[i].way);
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf): %s\n", i, 
+        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) ", i, 
                 ri.ways[i].from, ri.nodes[ri.ways[i].from].lat, ri.nodes[ri.ways[i].from].lon, 
-                ri.ways[i].next, ri.nodes[ri.ways[i].next].lat, ri.nodes[ri.ways[i].next].lon, 
-                TAG_HIGHWAY_VALUES[ri.ways[i].type]);
+                ri.ways[i].next, ri.nodes[ri.ways[i].next].lat, ri.nodes[ri.ways[i].next].lon);
+        printf("\n");
         int k = ri.nrof_ways - 1 - i;
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf): %s\n", k, 
+        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) ", k, 
                 ri.ways[k].from, ri.nodes[ri.ways[k].from].lat, ri.nodes[ri.ways[k].from].lon, 
-                ri.ways[k].next, ri.nodes[ri.ways[k].next].lat, ri.nodes[ri.ways[k].next].lon, 
-                TAG_HIGHWAY_VALUES[ri.ways[k].type]);
+                ri.ways[k].next, ri.nodes[ri.ways[k].next].lat, ri.nodes[ri.ways[k].next].lon);
+        printf("\n");
         k = ri.nrof_nodes - 1 - i;
         printf("Node %d: %d (%lf %lf)\n", k, ri.nodes[k].id, ri.nodes[k].lat, ri.nodes[k].lon, ri.nodes[k].way);
     }

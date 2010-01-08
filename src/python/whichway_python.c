@@ -91,6 +91,9 @@ static PyObject *find_route(whichway_Router *self, PyObject *args) {
     PyDict_SetItemString(dict, "lons", lon_list);
     PyDict_SetItemString(dict, "length", Py_BuildValue("d", route->length));
 
+    if (route->nodes) free(route->nodes);
+    free(route);
+
     return dict;
 }
 
@@ -192,6 +195,9 @@ static void whichway_router_dealloc(whichway_Router *self)
 
     if (self->routingindex)
         free(self->routingindex);
+
+    if (self->nodes_sorted_by_lat)
+        free(self->nodes_sorted_by_lat);
 
     self->ob_type->tp_free((PyObject*)self);
 }

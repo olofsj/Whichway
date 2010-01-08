@@ -75,34 +75,37 @@ AStarScore * pop_min_f_from_list(List **list_p) {
 }
 
 Route * reconstruct_path(AStarScore *score) {
-    Route *res = malloc(sizeof(Route));
+    int i, nrof_nodes;
+    AStarScore *sc;
+    Route *res;
+
+    res = malloc(sizeof(Route));
     res->length = 0;
     res->nrof_nodes = 0;
     res->nodes = NULL;
 
+    // If score is null, return an empty route
     if (!score) 
         return res;
 
-    res->length = score->g;
-    res->nrof_nodes = 1;
-    AStarScore *sc = score;
-    while (sc->came_from) {
-        res->nrof_nodes++;
-        sc = sc->came_from;
+    // Get the number of nodes
+    nrof_nodes = 1;
+    for (sc = score; sc->came_from; sc = sc->came_from) {
+        nrof_nodes++;
     }
+    res->nrof_nodes = nrof_nodes;
 
-    res->nodes = malloc(res->nrof_nodes * sizeof(RoutingNode));
-    res->nodes[res->nrof_nodes-1].id = score->node->id;
-    res->nodes[res->nrof_nodes-1].lat = score->node->lat;
-    res->nodes[res->nrof_nodes-1].lon = score->node->lon;
-    sc = score;
-    int i = res->nrof_nodes-2;
-    while (sc->came_from) {
+    // Add all nodes to the route
+    res->nodes = malloc(nrof_nodes * sizeof(RoutingNode));
+    res->nodes[nrof_nodes-1].id = score->node->id;
+    res->nodes[nrof_nodes-1].lat = score->node->lat;
+    res->nodes[nrof_nodes-1].lon = score->node->lon;
+    for (sc = score, i = nrof_nodes-2; sc->came_from; sc = sc->came_from, i--) {
         res->nodes[i].id = sc->came_from->node->id;
         res->nodes[i].lat = sc->came_from->node->lat;
         res->nodes[i].lon = sc->came_from->node->lon;
-        sc = sc->came_from;
-        i--;
+        res->length += distance(sc->node->lat, sc->node->lon, 
+                sc->came_from->node->lat, sc->came_from->node->lon);
     }
 
     return res;

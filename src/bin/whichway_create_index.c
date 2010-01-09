@@ -39,8 +39,8 @@ TAG used_highways[] = { highway_motorway, highway_motorway_link, highway_trunk,
     highway_unclassified, highway_road, highway_residential,
     highway_living_street, highway_service, highway_track, highway_pedestrian,
     highway_services, highway_path, highway_cycleway, highway_footway,
-    highway_bridleway, highway_byway };
-int nrof_used_highways = 22;
+    highway_bridleway, highway_byway, highway_steps };
+int nrof_used_highways = 23;
 
 /* Global variables */
 int depth;

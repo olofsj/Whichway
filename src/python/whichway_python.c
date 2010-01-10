@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <math.h>
+#include <time.h>
 #include "whichway_internal.h"
 
 char *tag_keys[] = TAG_KEYS;
@@ -23,6 +24,18 @@ typedef struct {
     RoutingProfile *profile;
     File *routingfile;
 } whichway_Router;
+
+static PyObject *set_max_route_length(whichway_Router *self, PyObject *args) {
+    double max_route_length;
+
+    // Get arguments
+    if (!PyArg_ParseTuple(args, "d", &max_route_length))
+        return NULL;
+    
+    self->profile->max_route_length = max_route_length;
+
+    return Py_True;
+}
 
 static PyObject *set_penalty(whichway_Router *self, PyObject *args) {
     char *key, *value;
@@ -43,6 +56,41 @@ static PyObject *set_penalty(whichway_Router *self, PyObject *args) {
     return Py_False;
 }
 
+static PyObject *find_nodes(whichway_Router *self, PyObject *args) {
+    double lat, lon, radius;
+    int *nodes, k;
+    PyObject *list;
+
+    // Get arguments
+    if (!PyArg_ParseTuple(args, "(dd)d", &lat, &lon, &radius))
+        return NULL;
+
+    struct timeval start;
+    struct timeval end;
+    double t;
+    gettimeofday(&start, NULL);
+
+    // Find all nodes within radius of (lat, lon)
+    nodes = ww_find_nodes(self->routingindex, self->nodes_sorted_by_lat, lat, lon, radius);
+
+    gettimeofday(&end, NULL);
+    t = ((double)end.tv_sec + (((double)end.tv_usec) / 1000000))
+        - ((double)start.tv_sec + (((double)start.tv_usec) / 1000000));
+    printf("Time to find nodes: %lf s.\n", t);
+
+    if (!nodes)
+        return NULL;
+
+    // Build return value
+    list = PyList_New(0);
+    for (k = 0; nodes[k] >= 0; k++) {
+        PyList_Append(list, Py_BuildValue("i", nodes[k]));
+    }
+    free(nodes);
+
+    return list;
+}
+
 static PyObject *find_closest_node(whichway_Router *self, PyObject *args) {
     double lat, lon;
     RoutingNode *closest;
@@ -51,8 +99,18 @@ static PyObject *find_closest_node(whichway_Router *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "(dd)", &lat, &lon))
         return NULL;
 
+    struct timeval start;
+    struct timeval end;
+    double t;
+    gettimeofday(&start, NULL);
+
     // Find closest node
     closest = ww_find_closest_node(self->routingindex, self->nodes_sorted_by_lat, lat, lon);
+
+    gettimeofday(&end, NULL);
+    t = ((double)end.tv_sec + (((double)end.tv_usec) / 1000000))
+        - ((double)start.tv_sec + (((double)start.tv_usec) / 1000000));
+    printf("Time to find closest node: %lf s.\n", t);
 
     if (!closest)
         return NULL;
@@ -61,17 +119,45 @@ static PyObject *find_closest_node(whichway_Router *self, PyObject *args) {
 }
 
 static PyObject *find_route(whichway_Router *self, PyObject *args) {
-    int from_id, to_id;
-    int k;
+    int *from_ids, k, from_size;
+    double to_lat, to_lon, tolerance;
     Route *route;
-    PyObject *id_list, *lat_list, *lon_list, *dict;
+    PyObject *id_list, *lat_list, *lon_list, *dict, *from_list;
 
     // Get arguments
-    if (!PyArg_ParseTuple(args, "(ii)", &from_id, &to_id))
+    if (!PyArg_ParseTuple(args, "O(dd)d", &from_list, &to_lat, &to_lon, &tolerance))
         return NULL;
 
+    if (!PyList_Check(from_list))
+        return NULL;
+
+    // Build a C array from the Python list object
+    from_size = PyList_Size(from_list);
+    from_ids = malloc((from_size +1) * sizeof(int));
+    for (k = 0; k < from_size; k++) {
+        PyObject *list_item = PyList_GetItem(from_list, k);
+        if (!PyInt_Check(list_item)) {
+            free(from_ids);
+            return NULL;
+        }
+        from_ids[k] = PyInt_AsLong(list_item);
+    }
+    from_ids[from_size] = -1;
+
+    struct timeval start;
+    struct timeval end;
+    double t;
+    gettimeofday(&start, NULL);
+
     // Calculate route
-    route = ww_routing_astar(self->routingindex, self->profile, from_id, to_id);
+    route = ww_routing_astar(self->routingindex, self->profile, from_ids, to_lat, to_lon, tolerance);
+
+    free(from_ids);
+
+    gettimeofday(&end, NULL);
+    t = ((double)end.tv_sec + (((double)end.tv_usec) / 1000000))
+        - ((double)start.tv_sec + (((double)start.tv_usec) / 1000000));
+    printf("Time to find route: %lf s.\n", t);
 
     if (!route)
         return Py_BuildValue("{s:[],s:[],s:[],s:d}", "ids", "lats","lons", "length", 0.0);
@@ -162,6 +248,7 @@ static int whichway_router_init(whichway_Router *self, PyObject *args, PyObject 
 
     /* Set up a profile */
     self->profile = malloc(sizeof(RoutingProfile));
+    self->profile->max_route_length = 10000.0;
     for (i = 0; i < NROF_TAGS; i++) {
         self->profile->penalty[i] = 1.0;
     }
@@ -203,7 +290,9 @@ static void whichway_router_dealloc(whichway_Router *self)
 }
 
 static PyMethodDef whichway_router_methods[] = {
+    {"set_max_route_length", (PyCFunction)set_max_route_length, METH_VARARGS, "Set the maximum length of routes, ie give up searching if no shorter route is found"},
     {"set_penalty", (PyCFunction)set_penalty, METH_VARARGS, "Set the penalty for a given tag"},
+    {"find_nodes", (PyCFunction)find_nodes, METH_VARARGS, "Find the node closest to a given coordinate"},
     {"find_closest_node", (PyCFunction)find_closest_node, METH_VARARGS, "Find the node closest to a given coordinate"},
     {"find_route", (PyCFunction)find_route, METH_VARARGS, "Find the best route between two nodes"},
     {NULL, NULL, 0, NULL}

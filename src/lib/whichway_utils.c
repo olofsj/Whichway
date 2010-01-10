@@ -5,17 +5,18 @@
 #include <math.h>
 #include "whichway_internal.h"
 
+#define EARTH_RADIUS 6371009
+
 // Calculate the distance between two points on the earths surface
 double distance(double from_lat, double from_lon, double to_lat, double to_lon) {
     // Earth radius
     double lambda, phi, phi_m;
-    double R = 6371009;
 
     phi_m = (to_lat + from_lat)/360.0*M_PI;
     phi = (to_lat - from_lat)/180.0*M_PI;
     lambda = (to_lon - from_lon)/180.0*M_PI;
 
-    return R*sqrt(phi*phi + pow(cos(phi_m)*lambda, 2));
+    return EARTH_RADIUS*sqrt(phi*phi + pow(cos(phi_m)*lambda, 2));
 }
 
 // Effective distance, with any penalties from the given profile
@@ -294,8 +295,11 @@ RoutingNode * ww_find_closest_node(RoutingIndex *ri, RoutingNode **sorted_by_lat
 
     int min_lat_index, i;
     RoutingNode *nd, *closest;
-    double min_d;
+    double min_d, distance_to_lat_factor;
 
+    distance_to_lat_factor = 180.0/(M_PI*EARTH_RADIUS);
+
+    // Get the index of the node with latitude closest to the sought latitude
     min_lat_index = min_lat_bsearch(sorted_by_lat, lat, 0, ri->nrof_nodes-1);
     if (min_lat_index < 0 || min_lat_index >= ri->nrof_nodes)
         return NULL;
@@ -303,9 +307,10 @@ RoutingNode * ww_find_closest_node(RoutingIndex *ri, RoutingNode **sorted_by_lat
     closest = sorted_by_lat[min_lat_index];
     min_d = distance(lat, lon, closest->lat, closest->lon);
 
+    // Check until we find the closest node
     i = min_lat_index-1;
     nd = sorted_by_lat[i];
-    while (i >= 0 && abs(nd->lat - lat) < min_d) {
+    while (i >= 0 && abs(nd->lat - lat) < min_d*distance_to_lat_factor) {
         double d;
         d = distance(lat, lon, nd->lat, nd->lon);
         if (d < min_d) {
@@ -317,7 +322,7 @@ RoutingNode * ww_find_closest_node(RoutingIndex *ri, RoutingNode **sorted_by_lat
 
     i = min_lat_index+1;
     nd = sorted_by_lat[i];
-    while (i < ri->nrof_nodes && abs(nd->lat - lat) < min_d) {
+    while (i < ri->nrof_nodes && abs(nd->lat - lat) < min_d*distance_to_lat_factor) {
         double d;
         d = distance(lat, lon, nd->lat, nd->lon);
         if (d < min_d) {
@@ -330,3 +335,69 @@ RoutingNode * ww_find_closest_node(RoutingIndex *ri, RoutingNode **sorted_by_lat
     return closest;
 
 }
+
+int * ww_find_nodes(RoutingIndex *ri, RoutingNode **sorted_by_lat, 
+        double lat, double lon, double radius) {
+
+    if (!sorted_by_lat) {
+        sorted_by_lat = ww_nodes_get_sorted_by_lat(ri);
+    }
+
+    int min_lat_index, i, *result;
+    RoutingNode *nd, *closest;
+    double min_d, max_lat_diff, distance_to_lat_factor;
+    List *l, *nodes;
+        
+    distance_to_lat_factor = 180.0/(M_PI*EARTH_RADIUS);
+    max_lat_diff = radius * distance_to_lat_factor;
+
+    nodes = NULL;
+
+    // Get the index of the node with latitude closest to the sought latitude
+    min_lat_index = min_lat_bsearch(sorted_by_lat, lat, 0, ri->nrof_nodes-1);
+    if (min_lat_index < 0 || min_lat_index >= ri->nrof_nodes)
+        return NULL;
+
+    // Check all nodes which could be close enough, given only latitude
+    i = min_lat_index;
+    nd = sorted_by_lat[i];
+    while (i >= 0 && abs(nd->lat - lat) < max_lat_diff) {
+        double d;
+        d = distance(lat, lon, nd->lat, nd->lon);
+        if (d < radius) {
+            nodes = list_prepend(nodes, &(nd->id));
+        }
+        nd = sorted_by_lat[--i];
+    }
+
+    i = min_lat_index+1;
+    nd = sorted_by_lat[i];
+    while (i < ri->nrof_nodes && abs(nd->lat - lat) < max_lat_diff) {
+        double d;
+        d = distance(lat, lon, nd->lat, nd->lon);
+        if (d < radius) {
+            nodes = list_prepend(nodes, &(nd->id));
+        }
+        nd = sorted_by_lat[++i];
+    }
+
+    // Build return array
+    result = malloc(sizeof(int) * (list_count(nodes)+1));
+    for (i = 0, l = nodes; l; i++, l = l->next) {
+        int *id;
+        id = l->data;
+        result[i] = *id;
+    }
+    result[i] = -1;
+
+    // Free list
+    l = nodes;
+    while (l) {
+        List *ll = l->next;
+        free(l);
+        l = ll;
+    }
+
+    return result;
+}
+

@@ -95,6 +95,7 @@ main(int argc, char **argv)
 
 
     // Test routing
+    /*
     Route *route;
     int from[] = {5499470, 292874624, 5499470, 292874624, 292874634, 424189, 424181};
     int to[] = {277299251, 292820169, 609217, 523288845, 31659052, 424181, 424189};
@@ -112,15 +113,10 @@ main(int argc, char **argv)
         } else {
             printf("Optimal route: %d nodes, %lf m\n", route->nrof_nodes, route->length);
             int k;
-            /*
-            for (k = 0; k < route->nrof_nodes; k++) {
-                printf("%d ", route->nodes[k].id);
-            }
-            printf("\n");
-            */
         }
         printf("\n");
     }
+    */
     
     // Test finding closest nodes
     RoutingNode **nodes_sorted_by_lat = ww_nodes_get_sorted_by_lat(&ri);
@@ -134,5 +130,8 @@ main(int argc, char **argv)
     nd = ww_find_closest_node(&ri, nodes_sorted_by_lat, lat, lon);
 
     printf("Node closest to (%lf, %lf): %d (%lf, %lf)\n", lat, lon, nd->id, nd->lat, nd->lon);
+
+    int *nodes;
+    nodes = ww_find_nodes(&ri, nodes_sorted_by_lat, lat, lon, 50);
 }
 

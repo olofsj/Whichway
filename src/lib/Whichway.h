@@ -65,11 +65,15 @@ struct _RoutingTagSet {
 
 struct _RoutingProfile {
     double penalty[NROF_TAGS]; // A penalty for each tag
+    double max_route_length; // Give up if no route shorter than this is found
 };
 
-Route * ww_routing_astar(RoutingIndex *ri, RoutingProfile *profile, int from_id, int to_id);
+Route * ww_routing_astar(RoutingIndex *ri, RoutingProfile *profile, 
+        int *from_ids, double to_lat, double to_lon, double tolerance);
 
 RoutingNode * ww_find_closest_node(RoutingIndex *ri, RoutingNode **sorted_by_lat, double lat, double lon);
+
+int * ww_find_nodes(RoutingIndex *ri, RoutingNode **sorted_by_lat, double lat, double lon, double radius);
 
 RoutingNode ** ww_nodes_get_sorted_by_lat(RoutingIndex *ri);
 

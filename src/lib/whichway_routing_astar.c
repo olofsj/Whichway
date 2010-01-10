@@ -111,51 +111,54 @@ Route * reconstruct_path(AStarScore *score) {
     return res;
 }
 
-Route * ww_routing_astar(RoutingIndex *ri, RoutingProfile *profile, int from_id, int to_id) {
+Route * ww_routing_astar(RoutingIndex *ri, RoutingProfile *profile, 
+        int *from_ids, double to_lat, double to_lon, double tolerance) {
     List *closedset, *openset, *l;
     AStarScore *sc;
     RoutingNode *from, *to;
-    int from_index, to_index;
+    int from_index, to_index, from_id, i;
     Route *result = NULL;
-
-    // Find the start and end nodes in the index
-    from_index = routing_index_find_node(ri, from_id);
-    to_index = routing_index_find_node(ri, to_id);
-    from = &(ri->nodes[from_index]);
-    to = &(ri->nodes[to_index]);
-
-    printf("Routing from %d (%d) to %d (%d)\n", from_id, from_index,
-            to_id, to_index);
-
-    if (from_index < 0 || to_index < 0)
-        return NULL;
-
-    // Set up the score for the start node
-    sc = malloc(sizeof(AStarScore));
-    sc->n_index = routing_index_find_node(ri, from_id);
-    sc->node = &(ri->nodes[sc->n_index]);
-    sc->way = NULL;
-    sc->came_from = NULL;
-    sc->g = 0;
-    sc->h = distance(from->lat, from->lon, to->lat, to->lon);
-    sc->f = sc->h;
 
     // Set up the lists of open and closed nodes
     closedset = NULL;
-    openset = list_prepend(NULL, sc);
+    openset = NULL;
+
+    for (i = 0, from_id = from_ids[i]; from_id >= 0; from_id = from_ids[++i]) {
+        // Find the start nodes in the index
+        from_index = routing_index_find_node(ri, from_id);
+        from = &(ri->nodes[from_index]);
+
+        if (from_index < 0 || to_index < 0)
+            continue;
+
+        // Set up the score for the start nodes
+        sc = malloc(sizeof(AStarScore));
+        sc->n_index = from_index;
+        sc->node = &(ri->nodes[sc->n_index]);
+        sc->way = NULL;
+        sc->came_from = NULL;
+        sc->g = 0;
+        sc->h = distance(from->lat, from->lon, to_lat, to_lon);
+        sc->f = sc->h;
+        openset = list_prepend(openset, sc);
+    }
 
     // Loop until there are no more nodes in the open set
     while (openset) {
         sc = pop_min_f_from_list(&openset);
         closedset = list_prepend(closedset, sc);
 
-        if (sc->node->id == to->id) {
+        if (sc->h <= tolerance) {
             // Found the optimal route
             result = reconstruct_path(sc);
 
             // Finished, goto the end for cleanup
             goto end;
         }
+
+        // Give up is longer than maximum length
+        if (sc->g > profile->max_route_length)
+            goto end;
 
         // Check if node is a dead end
         if (sc->node->way < 0)
@@ -204,7 +207,7 @@ Route * ww_routing_astar(RoutingIndex *ri, RoutingProfile *profile, int from_id,
             if (tentative_is_better == 1) {
                 sc2->came_from = sc;
                 sc2->g = tentative_g_score;
-                sc2->h = distance(sc2->node->lat, sc2->node->lon, to->lat, to->lon);
+                sc2->h = distance(sc2->node->lat, sc2->node->lon, to_lat, to_lon);
                 sc2->f = sc2->g + sc2->h;
             }
         }

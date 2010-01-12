@@ -22,8 +22,44 @@ typedef struct {
     RoutingIndex *routingindex;
     RoutingNode **nodes_sorted_by_lat;
     RoutingProfile *profile;
+    RoutingProfile **profiles;
     File *routingfile;
 } whichway_Router;
+
+static PyObject *set_profile(whichway_Router *self, PyObject *args) {
+    char *name;
+    int nrof_profiles, i;
+    RoutingProfile *p;
+
+    // Get arguments
+    if (!PyArg_ParseTuple(args, "s", &name))
+        return NULL;
+
+    for (i = 0, p = self->profiles[0]; p; p = self->profiles[++i]) {
+        if ( !strcmp(p->name, name) ) {
+            // Profile exists, select this one
+            self->profile = p;
+            break;
+        }
+    }
+    nrof_profiles = i;
+
+    if (!p) {
+        // No such profile, add new one
+        self->profiles = realloc(self->profiles, (nrof_profiles+2)*sizeof(RoutingProfile *));
+        self->profiles[nrof_profiles] = malloc(sizeof(RoutingProfile));
+        self->profiles[nrof_profiles+1] = NULL;
+        self->profile = self->profiles[nrof_profiles];
+
+        self->profile->name = strdup(name);
+        self->profile->max_route_length = 10000.0;
+        for (i = 0; i < NROF_TAGS; i++) {
+            self->profile->penalty[i] = 1.0;
+        }
+    }
+
+    return Py_True;
+}
 
 static PyObject *set_max_route_length(whichway_Router *self, PyObject *args) {
     double max_route_length;
@@ -246,8 +282,12 @@ static int whichway_router_init(whichway_Router *self, PyObject *args, PyObject 
 
     self->nodes_sorted_by_lat = ww_nodes_get_sorted_by_lat(self->routingindex);
 
-    /* Set up a profile */
-    self->profile = malloc(sizeof(RoutingProfile));
+    /* Set up a default profile */
+    self->profiles = malloc(2*sizeof(RoutingProfile *));
+    self->profiles[0] = malloc(sizeof(RoutingProfile));
+    self->profiles[1] = NULL;
+    self->profile = self->profiles[0];
+    self->profile->name = strdup("default");
     self->profile->max_route_length = 10000.0;
     for (i = 0; i < NROF_TAGS; i++) {
         self->profile->penalty[i] = 1.0;
@@ -290,6 +330,7 @@ static void whichway_router_dealloc(whichway_Router *self)
 }
 
 static PyMethodDef whichway_router_methods[] = {
+    {"set_profile", (PyCFunction)set_profile, METH_VARARGS, "Select a profile"},
     {"set_max_route_length", (PyCFunction)set_max_route_length, METH_VARARGS, "Set the maximum length of routes, ie give up searching if no shorter route is found"},
     {"set_penalty", (PyCFunction)set_penalty, METH_VARARGS, "Set the penalty for a given tag"},
     {"find_nodes", (PyCFunction)find_nodes, METH_VARARGS, "Find the node closest to a given coordinate"},

@@ -64,6 +64,7 @@ struct _RoutingTagSet {
 };
 
 struct _RoutingProfile {
+    char *name;
     double penalty[NROF_TAGS]; // A penalty for each tag
     double max_route_length; // Give up if no route shorter than this is found
 };

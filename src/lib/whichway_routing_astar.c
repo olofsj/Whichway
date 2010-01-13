@@ -161,12 +161,12 @@ Route * ww_routing_astar(RoutingIndex *ri, RoutingProfile *profile,
             goto end;
 
         // Check if node is a dead end
-        if (sc->node->way < 0)
+        if (sc->node->way.end == 0)
             continue;
 
         // Check all the nodes connected to this node
         int w_index;
-        for (w_index = sc->node->way; (w_index < ri->nrof_ways) && (ri->ways[w_index].from == sc->n_index); w_index++) {
+        for (w_index = sc->node->way.start; w_index < sc->node->way.end; w_index++) {
             RoutingWay *w = &(ri->ways[w_index]);
             RoutingTagSet *tagset = (void *)ri->tagsets + w->tagset;
 

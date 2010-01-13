@@ -15,6 +15,7 @@
 
 typedef struct _WayNode WayNode;
 typedef struct _Way Way;
+typedef struct _TempRoutingWay TempRoutingWay;
 
 struct _WayNode {
     int id;
@@ -28,6 +29,11 @@ struct _Way {
     int oneway;
     int size;
     RoutingTagSet *tagset;
+};
+
+struct _TempRoutingWay {
+    int node_id;
+    RoutingWay *way;
 };
 
 char *tag_keys[] = TAG_KEYS;
@@ -77,8 +83,8 @@ node_sort_cb(const void *n1, const void *n2)
 int
 way_sort_cb(const void *n1, const void *n2)
 {
-    const RoutingWay *m1 = NULL;
-    const RoutingWay *m2 = NULL;
+    const TempRoutingWay *m1 = NULL;
+    const TempRoutingWay *m2 = NULL;
 
     if (!n1) return(1);
     if (!n2) return(-1);
@@ -86,9 +92,9 @@ way_sort_cb(const void *n1, const void *n2)
     m1 = n1;
     m2 = n2;
 
-    if (m1->from > m2->from)
+    if (m1->node_id > m2->node_id)
         return 1;
-    if (m1->from < m2->from)
+    if (m1->node_id < m2->node_id)
         return -1;
     return 0;
 }
@@ -125,7 +131,8 @@ nodeparser_start(void *data, const char *el, const char **attr) {
       node_count++;
 
       node = malloc(sizeof(RoutingNode));
-      node->way = 0;
+      node->way.start = 0;
+      node->way.end = 0;
 
       /* Check all the attributes for this node */
       for (i = 0; attr[i]; i += 2) {
@@ -274,37 +281,43 @@ wayparser_end(void *data, const char *el) {
             // Add each segment of the way into the index
             cn = way.start;
             while (cn->next) {
+                TempRoutingWay *tmpw = malloc(sizeof(TempRoutingWay));
                 RoutingWay *w = malloc(sizeof(RoutingWay));
 
                 w->tagset = tagset;
-                w->from = cn->id;
                 w->next = cn->next->id;
-                way_list = list_prepend(way_list, w);
+                way_list = list_prepend(way_list, tmpw);
+
+                tmpw->node_id = cn->id;
+                tmpw->way = w;
 
                 // Mark nodes as used
                 nd = get_node(cn->id);
                 if (nd)
-                    nd->way++;
+                    nd->way.start++;
                 nd = get_node(cn->next->id);
                 if (nd)
-                    nd->way++;
+                    nd->way.start++;
 
                 // if not oneway, add the reverse way as well
                 if (!way.oneway) {
+                    TempRoutingWay *tmpw = malloc(sizeof(TempRoutingWay));
                     RoutingWay *w = malloc(sizeof(RoutingWay));
 
                     w->tagset = tagset;
-                    w->from = cn->next->id;
                     w->next = cn->id;
-                    way_list = list_prepend(way_list, w);
+                    way_list = list_prepend(way_list, tmpw);
+
+                    tmpw->node_id = cn->next->id;
+                    tmpw->way = w;
 
                     // Mark nodes as used
                     nd = get_node(cn->id);
                     if (nd)
-                        nd->way++;
+                        nd->way.start++;
                     nd = get_node(cn->next->id);
                     if (nd)
-                        nd->way++;
+                        nd->way.start++;
                 }
 
                 cn = cn->next;
@@ -487,7 +500,7 @@ main(int argc, char **argv)
     l = node_list;
     while (l) {
         nd = l->data;
-        if (nd->way > 0) {
+        if (nd->way.start > 0) {
             ri.nrof_nodes++;
         }
         l = l->next;
@@ -499,8 +512,7 @@ main(int argc, char **argv)
     l = node_list;
     while (l) {
         nd = l->data;
-        if (nd->way > 0) {
-            nd->way = -1;
+        if (nd->way.start > 0) {
             memcpy(&(ri.nodes[i]), nd, sizeof(RoutingNode));
             i++;
         }
@@ -513,20 +525,23 @@ main(int argc, char **argv)
     l = way_list;
     i = 0;
     while (l) {
-        w = l->data;
-        w->from = routing_index_find_node(&ri, w->from);
+        TempRoutingWay *tmpw;
+        int node_id;
+        tmpw = l->data;
+        w = tmpw->way;
+
+        // Update the references from the node to this way
+        node_id = routing_index_find_node(&ri, tmpw->node_id);
+        if (ri.nodes[node_id].way.end == 0) {
+            ri.nodes[node_id].way.start = i;
+        }
+        ri.nodes[node_id].way.end = i+1;
+
+        // Copy the way into the routing index
         w->next = routing_index_find_node(&ri, w->next);
         memcpy(&(ri.ways[i]), w, sizeof(RoutingWay));
-        l = l->next; i++;
-    }
 
-    // Update the nodes in the index with the index of the first way 
-    // leading from that node
-    printf("Updating node index references...\n");
-    for (i = 0; i < ri.nrof_ways; i++) {
-        if (ri.nodes[ri.ways[i].from].way == -1) {
-            ri.nodes[ri.ways[i].from].way = i;
-        }
+        l = l->next; i++;
     }
 
     // Write the routing index to disk
@@ -559,18 +574,16 @@ main(int argc, char **argv)
     
 
     for (i = 0; i < 5; i++) {
-        printf("Node %d: %d (%lf %lf) %d\n", i, ri.nodes[i].id, ri.nodes[i].lat, ri.nodes[i].lon, ri.nodes[i].way);
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) ", i, 
-                ri.ways[i].from, ri.nodes[ri.ways[i].from].lat, ri.nodes[ri.ways[i].from].lon, 
+        printf("Node %d: %d (%lf %lf) %d\n", i, ri.nodes[i].id, ri.nodes[i].lat, ri.nodes[i].lon, ri.nodes[i].way.start);
+        printf("Way %d: %d (%lf %lf) ", i, 
                 ri.ways[i].next, ri.nodes[ri.ways[i].next].lat, ri.nodes[ri.ways[i].next].lon);
         printf("\n");
         int k = ri.nrof_ways - 1 - i;
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) ", k, 
-                ri.ways[k].from, ri.nodes[ri.ways[k].from].lat, ri.nodes[ri.ways[k].from].lon, 
+        printf("Way %d: %d (%lf %lf) ", k, 
                 ri.ways[k].next, ri.nodes[ri.ways[k].next].lat, ri.nodes[ri.ways[k].next].lon);
         printf("\n");
         k = ri.nrof_nodes - 1 - i;
-        printf("Node %d: %d (%lf %lf)\n", k, ri.nodes[k].id, ri.nodes[k].lat, ri.nodes[k].lon, ri.nodes[k].way);
+        printf("Node %d: %d (%lf %lf)\n", k, ri.nodes[k].id, ri.nodes[k].lat, ri.nodes[k].lon, ri.nodes[k].way.start);
     }
 
     //for (i = 0; i < 10; i++)

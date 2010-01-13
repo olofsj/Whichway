@@ -32,11 +32,14 @@ typedef enum { highway_motorway, highway_motorway_link, highway_trunk,
 
 
 struct _RoutingNode {
-    int id;       // OSM id
-    int way;      // The index of the first way leading from this node
+    unsigned int id;       // OSM id
+    struct {
+        unsigned int start; // The index of the first way leading from this node
+        unsigned int end;   // The index of the first way not belonging to this node
+    } way;
     double lat;
     double lon;
-};
+} __attribute__ ((__packed__));
 
 struct _Route {
     int nrof_nodes;
@@ -45,23 +48,22 @@ struct _Route {
 };
 
 struct _RoutingIndex {
-    int nrof_ways;
-    int nrof_nodes;
+    unsigned int nrof_ways;
+    unsigned int nrof_nodes;
     RoutingWay *ways;
     RoutingNode *nodes;
     RoutingTagSet *tagsets;
 };
 
 struct _RoutingWay {
-    int from; // The index of the node this way leads from
-    int next; // The index of the node this leads to
-    int tagset;
-};
+    unsigned int next; // The index of the node this leads to
+    unsigned char tagset;
+} __attribute__ ((__packed__));
 
 struct _RoutingTagSet {
-    int size;
+    unsigned int size;
     TAG tags[0];
-};
+} __attribute__ ((__packed__));
 
 struct _RoutingProfile {
     char *name;

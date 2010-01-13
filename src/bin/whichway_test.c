@@ -73,8 +73,7 @@ main(int argc, char **argv)
 
     for (i = 0; i < 5; i++) {
         RoutingTagSet *ts;
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) : ", i, 
-                ri.ways[i].from, ri.nodes[ri.ways[i].from].lat, ri.nodes[ri.ways[i].from].lon, 
+        printf("Way %d: %d (%lf %lf) : ", i, 
                 ri.ways[i].next, ri.nodes[ri.ways[i].next].lat, ri.nodes[ri.ways[i].next].lon);
         ts = (void *)ri.tagsets + ri.ways[i].tagset;
         for (j = 0; j < ts->size; j++) {
@@ -83,8 +82,7 @@ main(int argc, char **argv)
         printf("\n");
         
         int k = ri.nrof_ways - 1 - i;
-        printf("Way %d: %d (%lf %lf) - %d (%lf %lf) : ", k, 
-                ri.ways[k].from, ri.nodes[ri.ways[k].from].lat, ri.nodes[ri.ways[k].from].lon, 
+        printf("Way %d: %d (%lf %lf) : ", k, 
                 ri.ways[k].next, ri.nodes[ri.ways[k].next].lat, ri.nodes[ri.ways[k].next].lon);
         ts = (void *)ri.tagsets + ri.ways[k].tagset;
         for (j = 0; j < ts->size; j++) {
@@ -95,29 +93,27 @@ main(int argc, char **argv)
 
 
     // Test routing
-    /*
     Route *route;
-    int from[] = {5499470, 292874624, 5499470, 292874624, 292874634, 424189, 424181};
-    int to[] = {277299251, 292820169, 609217, 523288845, 31659052, 424181, 424189};
+    int from[] = {31659011, 292832071, 503509195, 292832070, 503509194, 503509193, -1};
+    double to_lat = 59.427165484589999; 
+    double to_lon = 17.811964056444001;
 
     RoutingProfile profile;
     for (i = 0; i < NROF_TAGS; i++) {
         profile.penalty[i] = 1.0;
     }
+    profile.max_route_length = 20000;
 
-    for (i = 0; i < 7; i++) {
-        printf("Test route from %d to %d\n", from[i], to[i]);
-        route = ww_routing_astar(&ri, &profile, from[i], to[i]);
-        if (!route) {
-            printf("No route found.\n");
-        } else {
-            printf("Optimal route: %d nodes, %lf m\n", route->nrof_nodes, route->length);
-            int k;
-        }
-        printf("\n");
+    printf("Test routing\n");
+    route = ww_routing_astar(&ri, &profile, from, to_lat, to_lon, 50.0);
+    if (!route) {
+        printf("No route found.\n");
+    } else {
+        printf("Optimal route: %d nodes, %lf m\n", route->nrof_nodes, route->length);
+        int k;
     }
-    */
-    
+    printf("\n");
+
     // Test finding closest nodes
     RoutingNode **nodes_sorted_by_lat = ww_nodes_get_sorted_by_lat(&ri);
 
